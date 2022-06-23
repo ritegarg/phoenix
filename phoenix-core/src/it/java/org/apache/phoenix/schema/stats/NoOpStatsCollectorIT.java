@@ -17,6 +17,7 @@
  */
 package org.apache.phoenix.schema.stats;
 
+import org.apache.phoenix.query.BaseTest;
 import org.apache.phoenix.thirdparty.com.google.common.collect.Maps;
 import org.apache.phoenix.end2end.NeedsOwnMiniClusterTest;
 import org.apache.phoenix.end2end.ParallelStatsDisabledIT;
@@ -25,6 +26,7 @@ import org.apache.phoenix.util.PropertiesUtil;
 import org.apache.phoenix.util.ReadOnlyProps;
 import org.apache.phoenix.util.SchemaUtil;
 import org.apache.phoenix.util.TestUtil;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -50,10 +52,9 @@ import static org.apache.phoenix.util.TestUtil.TEST_PROPERTIES;
  * explicitly using QueryServices#STATS_COLLECTION_ENABLED property
  */
 @Category(NeedsOwnMiniClusterTest.class)
-public class NoOpStatsCollectorIT extends ParallelStatsDisabledIT {
+public class NoOpStatsCollectorIT extends BaseTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NoOpStatsCollectorIT.class);
-
     private String fullTableName;
     private String physicalTableName;
     private Connection conn;
@@ -66,6 +67,11 @@ public class NoOpStatsCollectorIT extends ParallelStatsDisabledIT {
         Map<String, String> props = Maps.newHashMapWithExpectedSize(1);
         props.put(QueryServices.STATS_COLLECTION_ENABLED, Boolean.FALSE.toString());
         setUpTestDriver(new ReadOnlyProps(props.entrySet().iterator()));
+    }
+
+    @AfterClass
+    public static synchronized void tearDown() throws Exception {
+        tearDownMiniCluster(0);
     }
 
     @Before
