@@ -72,10 +72,14 @@ public class SchemaSynthesisProcessor implements SchemaProcessor {
     }
 
     private String synthesize(String baseDDL, String nextDDL) throws Exception {
+        if (nextDDL.equals(baseDDL)) return nextDDL;
         if (baseDDL == null && nextDDL != null) {
             BindableStatement bStmt = new SQLParser(nextDDL).parseStatement();
             if (bStmt instanceof CreateTableStatement || bStmt instanceof CreateIndexStatement) {
                 return nextDDL;
+            }
+            if (bStmt instanceof DropTableStatement || bStmt instanceof DropIndexStatement) {
+                return null;
             }
             throw new Exception(UNSUPPORTED_DDL_EXCEPTION);
         }

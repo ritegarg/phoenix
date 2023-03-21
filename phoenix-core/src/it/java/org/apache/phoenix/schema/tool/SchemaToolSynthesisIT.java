@@ -39,6 +39,25 @@ public class SchemaToolSynthesisIT {
 
 
     @Test
+    // Test first DDL for an entity is DROP
+    public void testFirstDdlIsDROPTable() throws Exception {
+        String expected = "CREATE TABLE IF NOT EXISTS TEST.SAMPLE_TABLE (\n"
+                + "ORG_ID CHAR(15) NOT NULL,\n"
+                + "STATUS VARCHAR\n"
+                + "CONSTRAINT PK PRIMARY KEY (ORG_ID)\n"
+                + ") VERSIONS=1,MULTI_TENANT=FALSE,REPLICATION_SCOPE=1,TTL=31536000";
+        String baseDDL = filePath+"/create_dropped_table.sql";
+        runAndVerify(expected, baseDDL);
+    }
+
+    @Test
+    // Test first DDL for an entity is DROP
+    public void testFirstDdlIsDROPView() throws Exception {
+        String expected = "CREATE VIEW IF NOT EXISTS TEST.SAMPLE_VIEW AS SELECT * FROM TEST.SAMPLE_TABLE";
+        String baseDDL = filePath+"/create_dropped_view.sql";
+        runAndVerify(expected, baseDDL);
+    }
+    @Test
     // Adding new column RELATED_COMMAND
     public void testCreateTableStatement_addColumn() throws Exception {
         String expected = "CREATE TABLE IF NOT EXISTS TEST.SAMPLE_TABLE\n"
