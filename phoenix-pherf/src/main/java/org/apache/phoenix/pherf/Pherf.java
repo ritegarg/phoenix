@@ -107,6 +107,7 @@ public class Pherf {
         options.addOption("t", "thin", false, "Use the Phoenix Thin Driver");
         options.addOption("s", "server", true, "The URL for the Phoenix QueryServer");
         options.addOption("b", "batchApi", false, "Use JDBC Batch API for writes");
+        options.addOption("isSignOffTest", false, "Set when running a functional test for sign off");
     }
 
     private final String zookeeper;
@@ -131,6 +132,7 @@ public class Pherf {
     private final CompareType compareType;
     private final boolean thinDriver;
     private final String queryServerUrl;
+    private final boolean isSignOffTest;
     private Properties properties = new Properties();
 
     @VisibleForTesting
@@ -178,6 +180,7 @@ public class Pherf {
         zookeeper = command.getOptionValue("z", "localhost");
         queryHint = command.getOptionValue("hint", null);
         isFunctional = command.hasOption("diff");
+        isSignOffTest = command.hasOption("isSignOffTest");
         listFiles = command.hasOption("listFiles");
         applySchema = !command.hasOption("disableSchemaApply");
         writeRuntimeResults = !command.hasOption("disableRuntimeResult");
@@ -261,7 +264,7 @@ public class Pherf {
     public void run() throws Exception {
         MonitorManager monitorManager = null;
         List<Workload> workloads = new ArrayList<>();
-        workloadExecutor = new WorkloadExecutor(properties, workloads, !isFunctional);
+        workloadExecutor = new WorkloadExecutor(properties, workloads, !isFunctional, isSignOffTest);
         try {
             if (listFiles) {
                 ResourceList list = new ResourceList(PherfConstants.RESOURCE_DATAMODEL);

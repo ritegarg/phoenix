@@ -114,7 +114,7 @@ public class MultiTenantTestUtils {
         int perHandlerCount = 50;
 
         List<Workload> workloads = new ArrayList<>();
-        WorkloadExecutor workloadExecutor = new WorkloadExecutor(properties, workloads, false);
+        WorkloadExecutor workloadExecutor = new WorkloadExecutor(properties, workloads, false, false);
         try {
             PhoenixUtil pUtil = PhoenixUtil.create();
             for (Scenario scenario : model.getScenarios()) {
@@ -177,7 +177,7 @@ public class MultiTenantTestUtils {
         int totalOperations = 500;
 
         List<Workload> workloads = new ArrayList<>();
-        WorkloadExecutor workloadExecutor = new WorkloadExecutor(properties, workloads, false);
+        WorkloadExecutor workloadExecutor = new WorkloadExecutor(properties, workloads, false, false);
         try {
             PhoenixUtil pUtil = PhoenixUtil.create();
             for (Scenario scenario : model.getScenarios()) {

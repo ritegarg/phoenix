@@ -22,6 +22,7 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.apache.phoenix.pherf.configuration.Query;
 import org.apache.phoenix.pherf.configuration.Scenario;
 import org.apache.phoenix.pherf.configuration.XMLConfigParser;
+import org.apache.phoenix.pherf.exception.RowCountMismatchException;
 import org.apache.phoenix.pherf.result.DataModelResult;
 import org.apache.phoenix.pherf.result.ThreadTime;
 import org.apache.phoenix.pherf.rules.RulesApplier;
@@ -75,7 +76,7 @@ public class MultiThreadedRunnerTest {
         try {
             mtr.getResults(mockRS, "test_iteration", false,0L);
             fail();
-        } catch (RuntimeException e) {
+        } catch (RowCountMismatchException e) {
             //pass;
         }
 

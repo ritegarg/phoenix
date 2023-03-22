@@ -19,12 +19,15 @@
 package org.apache.phoenix.pherf;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hbase.client.Row;
 import org.apache.phoenix.end2end.NeedsOwnMiniClusterTest;
+import org.apache.phoenix.pherf.exception.RowCountMismatchException;
 import org.apache.phoenix.pherf.result.Result;
 import org.apache.phoenix.pherf.result.ResultValue;
 import org.apache.phoenix.pherf.result.file.ResultFileDetails;
 import org.apache.phoenix.pherf.result.impl.CSVFileResultHandler;
 import org.apache.phoenix.pherf.workload.mt.MultiTenantTestUtils;
+import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -135,4 +138,38 @@ public class PherfMainIT extends ResultBaseTestIT {
         }
     }
 
+    @Test
+    public void testRowCountMismatchException() throws Exception {
+        String[] args = {"-q", "-l",
+                "-drop", "all",
+                "-schemaFile", ".*row_count_mismatch_datamodel.sql",
+                "-scenarioFile", ".*row_count_mismatch_scenario.xml",
+                };
+
+        Pherf p = new Pherf(args);
+        try {
+            p.run();
+        }
+        catch (Exception e) {
+            Assert.fail("Row Count mismatch should not have thrown exception");
+            Assert.assertTrue("Expected: RowCountMismatchException, Actual: " + e, e instanceof RowCountMismatchException);
+        }
+
+        String[] signoff_args = {"-q", "-l",
+                "-drop", "all",
+                "-schemaFile", ".*row_count_mismatch_datamodel.sql",
+                "-scenarioFile", ".*row_count_mismatch_scenario.xml",
+                "-isSignOffTest"
+        };
+        p = new Pherf(signoff_args);
+        try {
+            p.run();
+            Assert.fail("Row Count mismatch should have thrown exception");
+        }
+        catch (Exception e) {
+            Assert.assertTrue("Expected: RowCountMismatchException, Actual: " + e, e instanceof RowCountMismatchException);
+        }
+
+
+    }
 }

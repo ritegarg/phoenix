@@ -18,6 +18,7 @@
 
 package org.apache.phoenix.pherf.workload;
 
+import org.apache.phoenix.pherf.exception.RowCountMismatchException;
 import org.apache.phoenix.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.phoenix.pherf.PherfConstants;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ public class WorkloadExecutor {
     private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadExecutor.class);
     private final int poolSize;
     private final boolean isPerformance;
+    private boolean isSignOffTest;
 
     // Jobs can be accessed by multiple threads
     @VisibleForTesting
@@ -45,11 +47,12 @@ public class WorkloadExecutor {
     }
 
     public WorkloadExecutor(Properties properties) throws Exception {
-        this(properties, new ArrayList(), true);
+        this(properties, new ArrayList(), true, false);
     }
 
-    public WorkloadExecutor(Properties properties, List<Workload> workloads, boolean isPerformance) throws Exception {
+    public WorkloadExecutor(Properties properties, List<Workload> workloads, boolean isPerformance, boolean isSignOffTest) throws Exception {
         this.isPerformance = isPerformance;
+        this.isSignOffTest = isSignOffTest;
         this.poolSize =
                 (properties.getProperty("pherf.default.threadpool") == null) ?
                         PherfConstants.DEFAULT_THREAD_POOL_SIZE :
@@ -68,7 +71,7 @@ public class WorkloadExecutor {
      * {@link org.apache.phoenix.pherf.workload.Workload} Requires complete() to be called, it must
      * be called prior to using this method. Otherwise it will block infinitely.
      */
-    public void get() {
+    public void get() throws Exception {
         for (Workload workload : jobs.keySet()) {
             get(workload);
         }
@@ -80,13 +83,21 @@ public class WorkloadExecutor {
      *
      * @param workload Key entry in the HashMap
      */
-    public void get(Workload workload) {
+    public void get(Workload workload) throws Exception {
         try {
             Future future = jobs.get(workload);
             future.get();
             jobs.remove(workload);
         } catch (InterruptedException | ExecutionException e) {
             LOGGER.error("", e);
+            // functional sign-off depends on matching row counts
+            //TODO: Extend the workload interface to include status information
+            if (isSignOffTest) {
+                // e -> ExecutionException -> RowCountMismatchException
+                if (e.getCause() != null && e.getCause().getCause() != null && e.getCause().getCause() instanceof RowCountMismatchException) {
+                    throw((RowCountMismatchException)e.getCause().getCause());
+                }
+            }
         }
     }
 

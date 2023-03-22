@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.concurrent.Callable;
 
 import org.apache.phoenix.pherf.PherfConstants;
+import org.apache.phoenix.pherf.exception.RowCountMismatchException;
 import org.apache.phoenix.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.phoenix.pherf.result.DataModelResult;
@@ -205,7 +206,7 @@ class MultiThreadedRunner implements Callable<Void> {
         while (rs.next()) {
             if (null != query.getExpectedAggregateRowCount()) {
                 if (rs.getLong(1) != query.getExpectedAggregateRowCount())
-                    throw new RuntimeException(
+                    throw new RowCountMismatchException(
                             "Aggregate count " + rs.getLong(1) + " does not match expected "
                                     + query.getExpectedAggregateRowCount());
             }
