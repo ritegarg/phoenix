@@ -397,6 +397,10 @@ public class GlobalIndexCheckerIT extends BaseTest {
             populateTable(dataTableName); // with two rows ('a', 'ab', 'abc', 'abcd') and ('b', 'bc', 'bcd', 'bcde')
             conn.createStatement().execute("CREATE INDEX " + indexTableName + " on " +
                     dataTableName + " (val1) include (val2, val3)" + this.indexDDLOptions);
+            // Sometimes the timestamp on the PTable and scn assignment happen in the same
+            // millisecond. This breaks the test when we create a scn connection because we get
+            // a TableNotFound exception. Sleeping ensures this never happens
+            Thread.sleep(2);
             scn = EnvironmentEdgeManager.currentTimeMillis();
             // Configure IndexRegionObserver to fail the data write phase
             IndexRegionObserver.setFailDataTableUpdatesForTesting(true);
