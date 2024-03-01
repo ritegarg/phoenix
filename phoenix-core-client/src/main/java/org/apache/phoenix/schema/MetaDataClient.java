@@ -3513,14 +3513,17 @@ public class MetaDataClient {
             String dataTableName = parent == null || tableType == PTableType.VIEW ? null : parent.getTableName().getString();
             PIndexState defaultCreateState;
             String defaultCreateStateString = connection.getClientInfo(INDEX_CREATE_DEFAULT_STATE);
+            String defaultIndexStateSourceForLogging = "CONNECTION";
             if (defaultCreateStateString == null)  {
                 defaultCreateStateString = connection.getQueryServices().getConfiguration().get(
                      INDEX_CREATE_DEFAULT_STATE, QueryServicesOptions.DEFAULT_CREATE_INDEX_STATE);
+                defaultIndexStateSourceForLogging = "CQSI";
             }
             defaultCreateState = PIndexState.valueOf(defaultCreateStateString);
             if (defaultCreateState == PIndexState.CREATE_DISABLE) {
                 if  (indexType == IndexType.LOCAL || sharedTable) {
                     defaultCreateState = PIndexState.BUILDING;
+                    defaultIndexStateSourceForLogging = "LocalIndex/SharedTable";
                 }
             }
             PIndexState indexState = parent == null ||
@@ -3528,6 +3531,10 @@ public class MetaDataClient {
                     null : defaultCreateState;
             if (indexState == null && tableProps.containsKey(INDEX_STATE)) {
                 indexState = PIndexState.fromSerializedValue(tableProps.get(INDEX_STATE).toString());
+                defaultIndexStateSourceForLogging = "TableProperty";
+            }
+            if (tableType == PTableType.INDEX) {
+                LOGGER.info("Using {} level Default Index State={} for Index={} ON {}", defaultIndexStateSourceForLogging, indexState.getSerializedValue(), tableName, parentTableName);
             }
             PreparedStatement tableUpsert = connection.prepareStatement(CREATE_TABLE);
             tableUpsert.setString(1, tenantIdStr);
