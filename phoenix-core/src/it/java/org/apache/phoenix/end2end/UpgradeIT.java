@@ -106,10 +106,14 @@ import org.apache.phoenix.util.TestUtil;
 import org.apache.phoenix.util.UpgradeUtil;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Category(NeedsOwnMiniClusterTest.class)
 public class UpgradeIT extends ParallelStatsDisabledIT {
-        
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(UpgradeIT.class);
+
     @Test
     public void testUpgradeRequiredPreventsSQL() throws SQLException {
         String tableName = generateUniqueName();
@@ -662,10 +666,17 @@ public class UpgradeIT extends ParallelStatsDisabledIT {
         long[] incrementedValues = new long[3];
         SQLException[] exceptions = new SQLException[3];
         //simulate incrementing the view indexes
+        Thread.sleep(2); // ensure that current ts > ts on SYSTEM.SEQUENCE table
         cqs.incrementSequences(allocations, EnvironmentEdgeManager.currentTimeMillis(), incrementedValues,
             exceptions);
         for (SQLException e : exceptions) {
-            assertNull(e);
+            try {
+                assertNull(e);
+            } catch (AssertionError ex) {
+                // log the stack trace of the SQL exception
+                LOGGER.error("Expected null but got exception", e);
+                throw ex;
+            }
         }
 
         try (PhoenixConnection mockUpgradeScnTsConn = new PhoenixConnection(
