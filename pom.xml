@@ -91,7 +91,6 @@
     <shadeSources>true</shadeSources>
 
     <!-- Dependency versions -->
-    <jackson-bom.version>2.14.1</jackson-bom.version>
     <netty-bom.version>4.1.108.Final</netty-bom.version>
     <antlr.version>3.5.2</antlr.version>
     <!-- Only used for tests with HBase 2.1-2.4 -->
@@ -153,7 +152,7 @@
     <exec-maven-plugin.version>3.1.1</exec-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.3.0</maven-checkstyle-plugin.version>
     <mvel2.version>2.5.2.Final</mvel2.version>
-    <maven-shade-plugin.version>3.3.0</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <maven-assembly-plugin.version>3.3.0</maven-assembly-plugin.version>
     <surefire.version>3.0.0-M6</surefire.version>
     <maven-javadoc-plugin.version>3.4.0</maven-javadoc-plugin.version>
@@ -447,7 +446,7 @@
               <ignoredUsedUndeclaredDependencies>
                 <ignoredUsedUndeclaredDependency>
                   <!-- couldn't figure out what's the deal with this -->
-                  dnsjava:dnsjava
+                  dnsjva:dnsjava
                 </ignoredUsedUndeclaredDependency>
                 <ignoredUsedUndeclaredDependency>
                   <!-- These change too frequently, so we just rely on the hbase transitive deps -->
@@ -1579,7 +1578,7 @@
       <dependency>
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
-        <version>${jackson-bom.version}</version>
+        <version>${jackson.version}</version>
         <scope>import</scope>
         <type>pom</type>
       </dependency>
