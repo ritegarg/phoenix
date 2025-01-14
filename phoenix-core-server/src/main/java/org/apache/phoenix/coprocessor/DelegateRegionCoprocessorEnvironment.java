@@ -30,6 +30,7 @@ import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.metrics.MetricRegistry;
 import org.apache.hadoop.hbase.regionserver.OnlineRegions;
 import org.apache.hadoop.hbase.regionserver.Region;
+import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.phoenix.util.ServerUtil.ConnectionFactory;
 import org.apache.phoenix.util.ServerUtil.ConnectionType;
 
@@ -108,6 +109,10 @@ public class DelegateRegionCoprocessorEnvironment implements RegionCoprocessorEn
     @Override
     public ServerName getServerName() {
         return delegate.getServerName();
+    }
+
+    public RegionServerServices getRegionServerServices() {
+        return delegate.getRegionServerServices();
     }
 
     @Override

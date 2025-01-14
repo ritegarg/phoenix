@@ -47,8 +47,8 @@ import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcUtils.BlockingRpcCallback;
 import org.apache.hadoop.hbase.ipc.ServerRpcController;
-import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.compile.QueryPlan;
 import org.apache.phoenix.compile.ScanRanges;
 import org.apache.phoenix.coprocessorclient.MetaDataProtocol;
@@ -430,9 +430,9 @@ public class ServerCacheClient {
                                                     : connection.getTenantId().getBytes();
                                         }
                                         if (tenantIdBytes != null) {
-                                            builder.setTenantId(ByteStringer.wrap(tenantIdBytes));
+                                            builder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantIdBytes));
                                         }
-                                        builder.setCacheId(ByteStringer.wrap(cacheId));
+                                        builder.setCacheId(UnsafeByteOperations.unsafeWrap(cacheId));
                                         instance.removeServerCache(controller, builder.build(), rpcCallback);
                                         if (controller.getFailedOn() != null) { throw controller.getFailedOn(); }
                                         return rpcCallback.get();
@@ -527,9 +527,9 @@ public class ServerCacheClient {
                     : connection.getTenantId().getBytes();
         }
         if (tenantIdBytes != null) {
-            builder.setTenantId(ByteStringer.wrap(tenantIdBytes));
+            builder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantIdBytes));
         }
-        builder.setCacheId(ByteStringer.wrap(cacheId));
+        builder.setCacheId(UnsafeByteOperations.unsafeWrap(cacheId));
         builder.setUsePersistentCache(usePersistentCache);
         builder.setCachePtr(org.apache.phoenix.protobuf.ProtobufUtil.toProto(cachePtr));
         builder.setHasProtoBufIndexMaintainer(true);
@@ -537,7 +537,7 @@ public class ServerCacheClient {
                 .newBuilder();
         svrCacheFactoryBuider.setClassName(cacheFactory.getClass().getName());
         builder.setCacheFactory(svrCacheFactoryBuider.build());
-        builder.setTxState(ByteStringer.wrap(txState));
+        builder.setTxState(UnsafeByteOperations.unsafeWrap(txState));
         builder.setClientVersion(MetaDataProtocol.PHOENIX_VERSION);
         final AddServerCacheRequest request = builder.build();
 

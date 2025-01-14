@@ -31,7 +31,7 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcUtils.BlockingRpcCallback;
 import org.apache.hadoop.hbase.ipc.ServerRpcController;
-import org.apache.hadoop.hbase.util.ByteStringer;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos.GetTableRequest;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos.MetaDataResponse;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos.MetaDataService;
@@ -107,9 +107,9 @@ public class InvalidIndexStateClientSideIT extends ParallelStatsDisabledIT {
                         BlockingRpcCallback<MetaDataResponse> rpcCallback =
                                 new BlockingRpcCallback<MetaDataResponse>();
                         GetTableRequest.Builder builder = GetTableRequest.newBuilder();
-                        builder.setTenantId(ByteStringer.wrap(tenantIdBytes));
-                        builder.setSchemaName(ByteStringer.wrap(schemaBytes));
-                        builder.setTableName(ByteStringer.wrap(tableBytes));
+                        builder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantIdBytes));
+                        builder.setSchemaName(UnsafeByteOperations.unsafeWrap(schemaBytes));
+                        builder.setTableName(UnsafeByteOperations.unsafeWrap(tableBytes));
                         builder.setTableTimestamp(tableTimestamp);
                         builder.setClientTimestamp(resolvedTimestamp);
                         builder.setClientVersion(VersionUtil.encodeVersion(PHOENIX_MAJOR_VERSION,

@@ -18,7 +18,7 @@
  
 package org.apache.hadoop.hbase.ipc.controller;
 
-import com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ipc.ServerRpcController;

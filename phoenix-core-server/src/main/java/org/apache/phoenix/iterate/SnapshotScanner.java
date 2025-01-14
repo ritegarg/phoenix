@@ -43,6 +43,7 @@ import org.apache.hadoop.hbase.mob.MobFileCache;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.OnlineRegions;
 import org.apache.hadoop.hbase.regionserver.Region;
+import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.util.CommonFSUtils;
 import org.apache.hadoop.hbase.HConstants;
@@ -258,6 +259,11 @@ public class SnapshotScanner extends AbstractClientScanner {
     public ServerName getServerName() {
         throw new UnsupportedOperationException();
     }
+
+      @Override
+      public RegionServerServices getRegionServerServices() {
+        throw new UnsupportedOperationException();
+      }
 
     @Override
     public Connection getConnection() {

@@ -50,11 +50,11 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.compile.ColumnResolver;
 import org.apache.phoenix.compile.FromCompiler;
 import org.apache.phoenix.compile.IndexExpressionCompiler;
@@ -1968,13 +1968,13 @@ public class IndexMaintainer implements Writable, Iterable<ColumnReference> {
         builder.setSaltBuckets(maintainer.nIndexSaltBuckets);
         builder.setIsMultiTenant(maintainer.isMultiTenant);
         if (maintainer.viewIndexId != null) {
-            builder.setViewIndexId(ByteStringer.wrap(maintainer.viewIndexId));
+            builder.setViewIndexId(UnsafeByteOperations.unsafeWrap(maintainer.viewIndexId));
             builder.setViewIndexIdType(maintainer.viewIndexIdType.getSqlType());
         }
         for (ColumnReference colRef : maintainer.indexedColumns) {
             ServerCachingProtos.ColumnReference.Builder cRefBuilder =  ServerCachingProtos.ColumnReference.newBuilder();
-            cRefBuilder.setFamily(ByteStringer.wrap(colRef.getFamily()));
-            cRefBuilder.setQualifier(ByteStringer.wrap(colRef.getQualifier()));
+            cRefBuilder.setFamily(UnsafeByteOperations.unsafeWrap(colRef.getFamily()));
+            cRefBuilder.setQualifier(UnsafeByteOperations.unsafeWrap(colRef.getQualifier()));
             builder.addIndexedColumns(cRefBuilder.build());
         }
         for (PDataType dataType : maintainer.indexedColumnTypes) {
@@ -1983,15 +1983,15 @@ public class IndexMaintainer implements Writable, Iterable<ColumnReference> {
         for (Entry<ColumnReference, ColumnReference> e : maintainer.coveredColumnsMap.entrySet()) {
             ServerCachingProtos.ColumnReference.Builder cRefBuilder =  ServerCachingProtos.ColumnReference.newBuilder();
             ColumnReference dataTableColRef = e.getKey();
-            cRefBuilder.setFamily(ByteStringer.wrap(dataTableColRef.getFamily()));
-            cRefBuilder.setQualifier(ByteStringer.wrap(dataTableColRef.getQualifier()));
+            cRefBuilder.setFamily(UnsafeByteOperations.unsafeWrap(dataTableColRef.getFamily()));
+            cRefBuilder.setQualifier(UnsafeByteOperations.unsafeWrap(dataTableColRef.getQualifier()));
             builder.addDataTableColRefForCoveredColumns(cRefBuilder.build());
             if (maintainer.encodingScheme != NON_ENCODED_QUALIFIERS) {
                 // We need to serialize the colRefs of index tables only in case of encoded column names.
                 ColumnReference indexTableColRef = e.getValue();
                 cRefBuilder =  ServerCachingProtos.ColumnReference.newBuilder();
-                cRefBuilder.setFamily(ByteStringer.wrap(indexTableColRef.getFamily()));
-                cRefBuilder.setQualifier(ByteStringer.wrap(indexTableColRef.getQualifier()));
+                cRefBuilder.setFamily(UnsafeByteOperations.unsafeWrap(indexTableColRef.getFamily()));
+                cRefBuilder.setQualifier(UnsafeByteOperations.unsafeWrap(indexTableColRef.getQualifier()));
                 builder.addIndexTableColRefForCoveredColumns(cRefBuilder.build());
             }
         }
@@ -2000,11 +2000,11 @@ public class IndexMaintainer implements Writable, Iterable<ColumnReference> {
             builder.setParentTableType(maintainer.parentTableType.toString());
         }       
         builder.setIndexDataColumnCount(maintainer.indexDataColumnCount);
-        builder.setIndexTableName(ByteStringer.wrap(maintainer.indexTableName));
+        builder.setIndexTableName(UnsafeByteOperations.unsafeWrap(maintainer.indexTableName));
         builder.setRowKeyOrderOptimizable(maintainer.rowKeyOrderOptimizable);
-        builder.setDataTableEmptyKeyValueColFamily(ByteStringer.wrap(maintainer.dataEmptyKeyValueCF));
+        builder.setDataTableEmptyKeyValueColFamily(UnsafeByteOperations.unsafeWrap(maintainer.dataEmptyKeyValueCF));
         ServerCachingProtos.ImmutableBytesWritable.Builder ibwBuilder = ServerCachingProtos.ImmutableBytesWritable.newBuilder();
-        ibwBuilder.setByteArray(ByteStringer.wrap(maintainer.emptyKeyValueCFPtr.get()));
+        ibwBuilder.setByteArray(UnsafeByteOperations.unsafeWrap(maintainer.emptyKeyValueCFPtr.get()));
         ibwBuilder.setLength(maintainer.emptyKeyValueCFPtr.getLength());
         ibwBuilder.setOffset(maintainer.emptyKeyValueCFPtr.getOffset());
         builder.setEmptyKeyValueColFamily(ibwBuilder.build());
@@ -2014,12 +2014,12 @@ public class IndexMaintainer implements Writable, Iterable<ColumnReference> {
                 WritableUtils.writeVInt(output, ExpressionType.valueOf(expression).ordinal());
                 expression.write(output);
             }
-            builder.setIndexedExpressions(ByteStringer.wrap(stream.toByteArray()));
+            builder.setIndexedExpressions(UnsafeByteOperations.unsafeWrap(stream.toByteArray()));
         }
         try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
             DataOutput output = new DataOutputStream(stream);
             maintainer.rowKeyMetaData.write(output);
-            builder.setRowKeyMetadata(ByteStringer.wrap(stream.toByteArray()));
+            builder.setRowKeyMetadata(UnsafeByteOperations.unsafeWrap(stream.toByteArray()));
         }
         builder.setNumDataTableColFamilies(maintainer.nDataCFs);
         builder.setIndexWalDisabled(maintainer.indexWALDisabled);
@@ -2045,12 +2045,12 @@ public class IndexMaintainer implements Writable, Iterable<ColumnReference> {
                 WritableUtils.writeVInt(output,
                         ExpressionType.valueOf(maintainer.indexWhere).ordinal());
                 maintainer.indexWhere.write(output);
-                builder.setIndexWhere(ByteStringer.wrap(stream.toByteArray()));
+                builder.setIndexWhere(UnsafeByteOperations.unsafeWrap(stream.toByteArray()));
                 for (ColumnReference colRef : maintainer.indexWhereColumns) {
                     ServerCachingProtos.ColumnReference.Builder cRefBuilder =
                             ServerCachingProtos.ColumnReference.newBuilder();
-                    cRefBuilder.setFamily(ByteStringer.wrap(colRef.getFamily()));
-                    cRefBuilder.setQualifier(ByteStringer.wrap(colRef.getQualifier()));
+                    cRefBuilder.setFamily(UnsafeByteOperations.unsafeWrap(colRef.getFamily()));
+                    cRefBuilder.setQualifier(UnsafeByteOperations.unsafeWrap(colRef.getQualifier()));
                     builder.addIndexWhereColumns(cRefBuilder.build());
                 }
             }

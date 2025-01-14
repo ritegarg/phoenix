@@ -22,9 +22,9 @@
   <parent>
     <groupId>org.apache.phoenix</groupId>
     <artifactId>phoenix</artifactId>
-    <version>5.3.0-SNAPSHOT</version>
+    <version>5.3.0-sfdc-13.0.0-SNAPSHOT</version>
   </parent>
-  <artifactId>phoenix-mapreduce-byo-shaded-hbase-${hbase.suffix}</artifactId>
+  <artifactId>phoenix-mapreduce-byo-shaded-hbase</artifactId>
   <name>Phoenix Mapreduce</name>
   <description>Phoenix Mapreduce JAR for use with the "hbase mapredcp" classpath</description>
   <packaging>jar</packaging>
@@ -526,11 +526,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-protocol</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-protocol-shaded</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -590,20 +585,8 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-      <!-- random version, for exclusion only -->
-      <version>11.0.2</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>com.github.stephenc.findbugs</groupId>
       <artifactId>findbugs-annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
       <scope>provided</scope>
     </dependency>
   </dependencies>

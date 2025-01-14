@@ -22,7 +22,7 @@
   <parent>
     <groupId>org.apache.phoenix</groupId>
     <artifactId>phoenix</artifactId>
-    <version>5.3.0-SNAPSHOT</version>
+    <version>5.3.0-sfdc-13.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>phoenix-core-client</artifactId>
   <name>Phoenix Core Client</name>
@@ -38,52 +38,6 @@
      <!-- If this is configured in the top-level dependencyManagement,
      it will run on the compat module even if the plugin is not enabled.
      Sounds like another maven bug -->
-     <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-enforcer-plugin</artifactId>
-          <configuration>
-            <rules>
-              <evaluateBeanshell>
-                <condition>
-                  import java.util.regex.Pattern;
-                  import java.lang.Integer;
-
-                  versionPattern = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)[^.]*$");
-                  versionMatcher = versionPattern.matcher("${hbase.version}");
-                  versionMatcher.find();
-
-                  hbaseMajor = Integer.parseInt(versionMatcher.group(1));
-                  hbaseMinor = Integer.parseInt(versionMatcher.group(2));
-                  hbasePatch = Integer.parseInt(versionMatcher.group(3));
-
-                  hbaseMajor == 2 &amp;&amp; (
-                    ("${hbase.compat.version}".equals("2.4.1")
-                      &amp;&amp; hbaseMinor == 4
-                      &amp;&amp; hbasePatch &gt;=1)
-                    || ("${hbase.compat.version}".equals("2.5.0")
-                      &amp;&amp; hbaseMinor == 5
-                      &amp;&amp; hbasePatch &gt;=0)
-                    || ("${hbase.compat.version}".equals("2.5.4")
-                      &amp;&amp; hbaseMinor == 5
-                      &amp;&amp; hbasePatch &gt;=4)
-                    || ("${hbase.compat.version}".equals("2.6.0")
-                      &amp;&amp; hbaseMinor == 6
-                      &amp;&amp; hbasePatch &gt;=0)
-                  )
-                </condition>
-              </evaluateBeanshell>
-            </rules>
-          </configuration>
-          <executions>
-         <execution>
-           <id>check-hbase-compatibility</id>
-           <phase>validate</phase>
-           <goals>
-             <goal>enforce</goal>
-           </goals>
-         </execution>
-       </executions>
-     </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
@@ -208,6 +162,48 @@
           </execution>
         </executions>
       </plugin>
+      <!--Need this old plugin to replace in generated files instances
+     of com.google.protobuf so instead its o.a.h.h.com.google.protobuf.
+     Plugin is old and in google code archive. Here is usage done by
+     anohther: https://github.com/beiliubei/maven-replacer-plugin/wiki/Usage-Guide
+     The mess with the regex in the below is to prevent replacement every time
+     we run mvn install. There is probably a better way of avoiding the
+     double interpolation but this is it for now.
+  -->
+      <plugin>
+        <groupId>com.google.code.maven-replacer-plugin</groupId>
+        <artifactId>replacer</artifactId>
+        <version>1.5.3</version>
+        <configuration>
+          <basedir>${basedir}/target/generated-sources/</basedir>
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+          <replacements>
+            <replacement>
+              <token>([^\.])com.google.protobuf</token>
+              <value>$1org.apache.hbase.thirdparty.com.google.protobuf</value>
+            </replacement>
+            <replacement>
+              <token>(public)(\W+static)?(\W+final)?(\W+class)</token>
+              <value>@javax.annotation.Generated("proto") $1$2$3$4</value>
+            </replacement>
+            <!-- replacer doesn't support anchoring or negative lookbehind -->
+            <replacement>
+              <token>(@javax.annotation.Generated\("proto"\) ){2}</token>
+              <value>$1</value>
+            </replacement>
+          </replacements>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>replace</goal>
+            </goals>
+            <phase>process-sources</phase>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
@@ -259,10 +255,6 @@
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-zookeeper</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-protocol</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
@@ -373,10 +365,6 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.htrace</groupId>

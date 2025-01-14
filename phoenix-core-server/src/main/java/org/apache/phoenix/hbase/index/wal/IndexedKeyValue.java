@@ -30,8 +30,8 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutationProto;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutationProto.MutationType;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto.MutationType;
 import org.apache.hadoop.hbase.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.phoenix.hbase.index.util.ImmutableBytesPtr;
@@ -161,10 +161,10 @@ public class IndexedKeyValue extends KeyValue {
     protected MutationProto toMutationProto(Mutation mutation)  throws IOException {
         MutationProto m = null;
         if(mutation instanceof Put){
-            m = org.apache.hadoop.hbase.protobuf.ProtobufUtil.toMutation(MutationType.PUT, 
+            m = org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil.toMutation(MutationType.PUT, 
                 mutation);
         } else if(mutation instanceof Delete) {
-            m = org.apache.hadoop.hbase.protobuf.ProtobufUtil.toMutation(MutationType.DELETE, 
+            m = org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil.toMutation(MutationType.DELETE, 
                 mutation);
         } else {
             throw new IOException("Put/Delete mutations only supported");

@@ -17,10 +17,10 @@
  */
 package org.apache.phoenix.end2end;
 
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
-import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.phoenix.coprocessor.PhoenixRegionServerEndpoint;
 import org.apache.phoenix.coprocessor.generated.RegionServerEndpointProtos;
@@ -183,9 +183,9 @@ public class PhoenixRegionServerEndpointIT extends BaseTest {
                 = RegionServerEndpointProtos.ValidateLastDDLTimestampRequest.newBuilder();
         RegionServerEndpointProtos.LastDDLTimestampRequest.Builder innerBuilder
                 = RegionServerEndpointProtos.LastDDLTimestampRequest.newBuilder();
-        innerBuilder.setTenantId(ByteStringer.wrap(tenantID));
-        innerBuilder.setSchemaName(ByteStringer.wrap(schemaName));
-        innerBuilder.setTableName(ByteStringer.wrap(tableName));
+        innerBuilder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantID));
+        innerBuilder.setSchemaName(UnsafeByteOperations.unsafeWrap(schemaName));
+        innerBuilder.setTableName(UnsafeByteOperations.unsafeWrap(tableName));
         innerBuilder.setLastDDLTimestamp(lastDDLTimestamp);
         requestBuilder.addLastDDLTimestampRequests(innerBuilder);
         return  requestBuilder.build();

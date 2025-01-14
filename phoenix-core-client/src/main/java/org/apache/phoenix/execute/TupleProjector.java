@@ -35,7 +35,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.Scan;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hbase.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.phoenix.compile.ColumnProjector;
 import org.apache.phoenix.compile.RowProjector;
 import org.apache.phoenix.coprocessor.generated.PTableProtos;

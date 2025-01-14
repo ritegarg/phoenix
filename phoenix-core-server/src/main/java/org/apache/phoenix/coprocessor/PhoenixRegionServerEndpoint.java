@@ -17,9 +17,9 @@
  */
 package org.apache.phoenix.coprocessor;
 
-import com.google.protobuf.RpcCallback;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.Service;
+//import com.google.protobuf.RpcCallback;
+//import com.google.protobuf.RpcController;
+//import com.google.protobuf.Service;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -28,6 +28,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.RegionServerCoprocessor;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcCallback;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.Service;
 import org.apache.phoenix.cache.ServerMetadataCache;
 import org.apache.phoenix.cache.ServerMetadataCacheImpl;
 import org.apache.phoenix.coprocessor.generated.RegionServerEndpointProtos;

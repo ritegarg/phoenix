@@ -1,0 +1,10 @@
+global:
+  email-reply-to: phoenixdatabaseteam@salesforce.com,bigdatascalemultitenancy@salesforce.com
+  node-type: c5d.18xlarge
+  timeout: 420
+  production-branches:
+    - 5.2-sfdc-13
+stages:
+  integration-test:
+    - maven-verify:
+        maven-publish-jar-args: -Dmaven.test.failure.ignore=true -Dsurefire.testFailureIgnore=true -Drat.skip=true

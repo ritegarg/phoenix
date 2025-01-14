@@ -28,7 +28,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
 import org.apache.phoenix.jdbc.ConnectionInfo;
 import org.apache.phoenix.jdbc.PhoenixConnection;
 import org.apache.phoenix.query.ConnectionQueryServicesImpl;

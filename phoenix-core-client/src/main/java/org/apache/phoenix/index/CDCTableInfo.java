@@ -18,7 +18,7 @@
 
 package org.apache.phoenix.index;
 
-import org.apache.hadoop.hbase.util.ByteStringer;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.compile.StatementContext;
 import org.apache.phoenix.compile.TupleProjectionCompiler;
 import org.apache.phoenix.coprocessor.generated.CDCInfoProtos;
@@ -141,14 +141,14 @@ public class CDCTableInfo {
         CDCInfoProtos.CDCTableDef.Builder builder = CDCInfoProtos.CDCTableDef.newBuilder();
         if (dataTable.getDefaultFamilyName() != null) {
             builder.setDefaultFamilyName(
-                    ByteStringer.wrap(dataTable.getDefaultFamilyName().getBytes()));
+                    UnsafeByteOperations.unsafeWrap(dataTable.getDefaultFamilyName().getBytes()));
         }
         String cdcIncludeScopes = context.getEncodedCdcIncludeScopes();
         if (cdcIncludeScopes != null) {
             builder.setCdcIncludeScopes(cdcIncludeScopes);
         }
         if (dataTable.getEncodingScheme() != null) {
-            builder.setQualifierEncodingScheme(ByteStringer.wrap(
+            builder.setQualifierEncodingScheme(UnsafeByteOperations.unsafeWrap(
                     new byte[] { dataTable.getEncodingScheme().getSerializedMetadataValue() }));
         }
         for (PColumn column : dataTable.getColumns()) {
@@ -158,7 +158,7 @@ public class CDCTableInfo {
             builder.addColumns(CDCColumnInfo.toProto(column));
         }
         PColumn cdcJsonCol = cdcTable.getColumnForColumnName(CDC_JSON_COL_NAME);
-        builder.setCdcJsonColQualBytes(ByteStringer.wrap(cdcJsonCol.getColumnQualifierBytes()));
+        builder.setCdcJsonColQualBytes(UnsafeByteOperations.unsafeWrap(cdcJsonCol.getColumnQualifierBytes()));
 
         TableRef cdcDataTableRef = context.getCDCDataTableRef();
         if (cdcDataTableRef.getTable().isImmutableRows() &&
@@ -175,7 +175,7 @@ public class CDCTableInfo {
             PTable projectedDataTable = TupleProjectionCompiler.createProjectedTable(
                     cdcDataTableRef, dataColumns, false);;
             TupleProjector dataTableProjector = new TupleProjector(projectedDataTable);
-            builder.setDataTableProjectorBytes(ByteStringer.wrap(
+            builder.setDataTableProjectorBytes(UnsafeByteOperations.unsafeWrap(
                     TupleProjector.serializeProjectorIntoBytes(dataTableProjector)));
         }
 
@@ -247,14 +247,14 @@ public class CDCTableInfo {
             CDCInfoProtos.CDCColumnDef.Builder builder = CDCInfoProtos.CDCColumnDef.newBuilder();
             builder.setColumnName(column.getName().toString());
             if (column.getFamilyName() != null) {
-                builder.setFamilyNameBytes(ByteStringer.wrap(column.getFamilyName().getBytes()));
+                builder.setFamilyNameBytes(UnsafeByteOperations.unsafeWrap(column.getFamilyName().getBytes()));
             }
             if (column.getDataType() != null) {
                 builder.setDataType(column.getDataType().getSqlTypeName());
             }
             if (column.getColumnQualifierBytes() != null) {
                 builder.setColumnQualifierBytes(
-                        ByteStringer.wrap(column.getColumnQualifierBytes()));
+                        UnsafeByteOperations.unsafeWrap(column.getColumnQualifierBytes()));
             }
             return builder.build();
         }

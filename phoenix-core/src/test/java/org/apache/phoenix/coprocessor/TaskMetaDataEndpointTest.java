@@ -18,7 +18,6 @@
 package org.apache.phoenix.coprocessor;
 
 
-import com.google.protobuf.RpcController;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.RawCellBuilder;
 import org.apache.hadoop.hbase.ServerName;
@@ -30,10 +29,12 @@ import org.apache.hadoop.hbase.coprocessor.RegionCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcUtils;
 import org.apache.hadoop.hbase.metrics.MetricRegistry;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.regionserver.OnlineRegions;
 import org.apache.hadoop.hbase.regionserver.Region;
+import org.apache.hadoop.hbase.regionserver.RegionServerServices;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos;
 import org.apache.phoenix.coprocessor.generated.TaskMetaDataProtos;
 import org.apache.phoenix.protobuf.ProtobufUtil;
@@ -97,6 +98,11 @@ public class TaskMetaDataEndpointTest {
 
             @Override
             public ServerName getServerName() {
+                return null;
+            }
+
+            @Override
+            public RegionServerServices getRegionServerServices() {
                 return null;
             }
 

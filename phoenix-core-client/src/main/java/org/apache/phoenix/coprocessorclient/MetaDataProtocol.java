@@ -24,7 +24,8 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
-import org.apache.hadoop.hbase.util.ByteStringer;
+import org.apache.hbase.thirdparty.com.google.protobuf.ByteString;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos.MetaDataResponse;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos.MetaDataService;
@@ -44,7 +45,6 @@ import org.apache.phoenix.util.MetaDataUtil;
 
 import org.apache.phoenix.thirdparty.com.google.common.base.Function;
 import org.apache.phoenix.thirdparty.com.google.common.collect.Lists;
-import com.google.protobuf.ByteString;
 
 /**
  *
@@ -451,14 +451,14 @@ public abstract class MetaDataProtocol extends MetaDataService {
             }
             if (result.getTableNamesToDelete() != null) {
               for (byte[] tableName : result.tableNamesToDelete) {
-                builder.addTablesToDelete(ByteStringer.wrap(tableName));
+                builder.addTablesToDelete(UnsafeByteOperations.unsafeWrap(tableName));
               }
             }
             if (result.getColumnName() != null){
-              builder.setColumnName(ByteStringer.wrap(result.getColumnName()));
+              builder.setColumnName(UnsafeByteOperations.unsafeWrap(result.getColumnName()));
             }
             if (result.getFamilyName() != null){
-              builder.setFamilyName(ByteStringer.wrap(result.getFamilyName()));
+              builder.setFamilyName(UnsafeByteOperations.unsafeWrap(result.getFamilyName()));
             }
             if (result.getSharedTablesToDelete() !=null){
               for (SharedTableState sharedTableState : result.sharedTablesToDelete) {
@@ -468,13 +468,13 @@ public abstract class MetaDataProtocol extends MetaDataService {
                     sharedTableStateBuilder.addColumns(PColumnImpl.toProto(col));
                 }
                 for (PName physicalName : sharedTableState.getPhysicalNames()) {
-                    sharedTableStateBuilder.addPhysicalNames(ByteStringer.wrap(physicalName.getBytes()));
+                    sharedTableStateBuilder.addPhysicalNames(UnsafeByteOperations.unsafeWrap(physicalName.getBytes()));
                 }
                 if (sharedTableState.getTenantId()!=null) {
-                    sharedTableStateBuilder.setTenantId(ByteStringer.wrap(sharedTableState.getTenantId().getBytes()));
+                    sharedTableStateBuilder.setTenantId(UnsafeByteOperations.unsafeWrap(sharedTableState.getTenantId().getBytes()));
                 }
-                sharedTableStateBuilder.setSchemaName(ByteStringer.wrap(sharedTableState.getSchemaName().getBytes()));
-                sharedTableStateBuilder.setTableName(ByteStringer.wrap(sharedTableState.getTableName().getBytes()));
+                sharedTableStateBuilder.setSchemaName(UnsafeByteOperations.unsafeWrap(sharedTableState.getSchemaName().getBytes()));
+                sharedTableStateBuilder.setTableName(UnsafeByteOperations.unsafeWrap(sharedTableState.getTableName().getBytes()));
                 sharedTableStateBuilder.setViewIndexId(sharedTableState.getViewIndexId());
                 sharedTableStateBuilder.setViewIndexIdType(sharedTableState.viewIndexIdType.getSqlType());
                 builder.addSharedTablesToDelete(sharedTableStateBuilder.build());

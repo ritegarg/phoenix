@@ -28,7 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.Admin;
-import org.apache.hadoop.hbase.util.ByteStringer;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.coprocessor.generated.RegionServerEndpointProtos;
 import org.apache.phoenix.exception.StaleMetadataCacheException;
 import org.apache.phoenix.jdbc.PhoenixConnection;
@@ -214,9 +214,9 @@ public class ValidateLastDDLTimestampUtil {
         byte[] schemaBytes = (schemaName == null || schemaName.isEmpty())
                 ?   HConstants.EMPTY_BYTE_ARRAY
                 : key.getSchemaName().getBytes();
-        builder.setTenantId(ByteStringer.wrap(tenantIDBytes));
-        builder.setSchemaName(ByteStringer.wrap(schemaBytes));
-        builder.setTableName(ByteStringer.wrap(tableName.getBytes()));
+        builder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantIDBytes));
+        builder.setSchemaName(UnsafeByteOperations.unsafeWrap(schemaBytes));
+        builder.setTableName(UnsafeByteOperations.unsafeWrap(tableName.getBytes()));
         builder.setLastDDLTimestamp(lastDDLTimestamp);
     }
 

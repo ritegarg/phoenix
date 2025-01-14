@@ -24,9 +24,9 @@ import org.apache.phoenix.thirdparty.com.google.common.collect.Sets;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.coprocessor.generated.ServerCachingProtos;
 import org.apache.phoenix.expression.Expression;
 import org.apache.phoenix.expression.ExpressionType;
@@ -312,30 +312,30 @@ public class TransformMaintainer extends IndexMaintainer {
 
         for (ColumnReference colRef : maintainer.newTableColumns) {
             ServerCachingProtos.ColumnReference.Builder cRefBuilder = ServerCachingProtos.ColumnReference.newBuilder();
-            cRefBuilder.setFamily(ByteStringer.wrap(colRef.getFamily()));
-            cRefBuilder.setQualifier(ByteStringer.wrap(colRef.getQualifier()));
+            cRefBuilder.setFamily(UnsafeByteOperations.unsafeWrap(colRef.getFamily()));
+            cRefBuilder.setQualifier(UnsafeByteOperations.unsafeWrap(colRef.getQualifier()));
             builder.addNewTableColumns(cRefBuilder.build());
         }
 
         for (Map.Entry<ColumnReference, ColumnReference> e : maintainer.coveredColumnsMap.entrySet()) {
             ServerCachingProtos.ColumnReference.Builder cRefBuilder = ServerCachingProtos.ColumnReference.newBuilder();
             ColumnReference dataTableColRef = e.getKey();
-            cRefBuilder.setFamily(ByteStringer.wrap(dataTableColRef.getFamily()));
-            cRefBuilder.setQualifier(ByteStringer.wrap(dataTableColRef.getQualifier()));
+            cRefBuilder.setFamily(UnsafeByteOperations.unsafeWrap(dataTableColRef.getFamily()));
+            cRefBuilder.setQualifier(UnsafeByteOperations.unsafeWrap(dataTableColRef.getQualifier()));
             builder.addOldTableColRefForCoveredColumns(cRefBuilder.build());
             ColumnReference newTableColRef = e.getValue();
             cRefBuilder = ServerCachingProtos.ColumnReference.newBuilder();
-            cRefBuilder.setFamily(ByteStringer.wrap(newTableColRef.getFamily()));
-            cRefBuilder.setQualifier(ByteStringer.wrap(newTableColRef.getQualifier()));
+            cRefBuilder.setFamily(UnsafeByteOperations.unsafeWrap(newTableColRef.getFamily()));
+            cRefBuilder.setQualifier(UnsafeByteOperations.unsafeWrap(newTableColRef.getQualifier()));
             builder.addNewTableColRefForCoveredColumns(cRefBuilder.build());
         }
 
         builder.setNewTableColumnCount(maintainer.newTableColumnCount);
-        builder.setNewTableName(ByteStringer.wrap(maintainer.newTableName));
+        builder.setNewTableName(UnsafeByteOperations.unsafeWrap(maintainer.newTableName));
         builder.setNewTableRowKeyOrderOptimizable(maintainer.newTableRowKeyOrderOptimizable);
-        builder.setOldTableEmptyKeyValueColFamily(ByteStringer.wrap(maintainer.oldTableEmptyKeyValueCF));
+        builder.setOldTableEmptyKeyValueColFamily(UnsafeByteOperations.unsafeWrap(maintainer.oldTableEmptyKeyValueCF));
         ServerCachingProtos.ImmutableBytesWritable.Builder ibwBuilder = ServerCachingProtos.ImmutableBytesWritable.newBuilder();
-        ibwBuilder.setByteArray(ByteStringer.wrap(maintainer.emptyKeyValueCFPtr.get()));
+        ibwBuilder.setByteArray(UnsafeByteOperations.unsafeWrap(maintainer.emptyKeyValueCFPtr.get()));
         ibwBuilder.setLength(maintainer.emptyKeyValueCFPtr.getLength());
         ibwBuilder.setOffset(maintainer.emptyKeyValueCFPtr.getOffset());
         builder.setEmptyKeyValueColFamily(ibwBuilder.build());
@@ -345,7 +345,7 @@ public class TransformMaintainer extends IndexMaintainer {
                 WritableUtils.writeVInt(output, ExpressionType.valueOf(expression).ordinal());
                 expression.write(output);
             }
-            builder.setNewTableExpressions(ByteStringer.wrap(stream.toByteArray()));
+            builder.setNewTableExpressions(UnsafeByteOperations.unsafeWrap(stream.toByteArray()));
         }
 
         builder.setNumDataTableColFamilies(maintainer.nOldTableCFs);

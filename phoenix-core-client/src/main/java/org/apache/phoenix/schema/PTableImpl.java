@@ -59,7 +59,6 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.phoenix.compile.ExpressionCompiler;
@@ -141,9 +140,9 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.compile.ExpressionCompiler;
 import org.apache.phoenix.compile.FromCompiler;
 import org.apache.phoenix.compile.QueryPlan;
@@ -2220,14 +2219,14 @@ public class PTableImpl implements PTable {
     public static PTableProtos.PTable toProto(PTable table) {
         PTableProtos.PTable.Builder builder = PTableProtos.PTable.newBuilder();
         if (table.getTenantId() != null) {
-            builder.setTenantId(ByteStringer.wrap(table.getTenantId().getBytes()));
+            builder.setTenantId(UnsafeByteOperations.unsafeWrap(table.getTenantId().getBytes()));
         }
-        builder.setSchemaNameBytes(ByteStringer.wrap(table.getSchemaName().getBytes()));
-        builder.setTableNameBytes(ByteStringer.wrap(table.getTableName().getBytes()));
+        builder.setSchemaNameBytes(UnsafeByteOperations.unsafeWrap(table.getSchemaName().getBytes()));
+        builder.setTableNameBytes(UnsafeByteOperations.unsafeWrap(table.getTableName().getBytes()));
         if (table.getPhysicalName(true) == null) {
-            builder.setPhysicalTableNameBytes(ByteStringer.wrap(table.getTableName().getBytes()));
+            builder.setPhysicalTableNameBytes(UnsafeByteOperations.unsafeWrap(table.getTableName().getBytes()));
         } else {
-            builder.setPhysicalTableNameBytes(ByteStringer.wrap(table.getPhysicalName(true).getBytes()));
+            builder.setPhysicalTableNameBytes(UnsafeByteOperations.unsafeWrap(table.getPhysicalName(true).getBytes()));
         }
         builder.setTableType(ProtobufUtil.toPTableTypeProto(table.getType()));
         if (table.getIndexState() != null) {
@@ -2239,15 +2238,15 @@ public class PTableImpl implements PTable {
                 builder.setViewIndexIdType(table.getviewIndexIdType().getSqlType());
             }
             if (table.getIndexType() != null) {
-                builder.setIndexType(ByteStringer
-                        .wrap(new byte[] { table.getIndexType().getSerializedValue() }));
+                builder.setIndexType(UnsafeByteOperations
+                        .unsafeWrap(new byte[] { table.getIndexType().getSerializedValue() }));
             }
         }
         builder.setSequenceNumber(table.getSequenceNumber());
         builder.setTimeStamp(table.getTimeStamp());
         PName tmp = table.getPKName();
         if (tmp != null) {
-            builder.setPkNameBytes(ByteStringer.wrap(tmp.getBytes()));
+            builder.setPkNameBytes(UnsafeByteOperations.unsafeWrap(tmp.getBytes()));
         }
         Integer bucketNum = table.getBucketNum();
         int offset = 0;
@@ -2274,16 +2273,16 @@ public class PTableImpl implements PTable {
         builder.setIsImmutableRows(table.isImmutableRows());
         // TODO remove this field in 5.0 release
         if (table.getParentName() != null) {
-            builder.setDataTableNameBytes(ByteStringer.wrap(table.getParentTableName().getBytes()));
+            builder.setDataTableNameBytes(UnsafeByteOperations.unsafeWrap(table.getParentTableName().getBytes()));
         }
         if (table.getParentName() != null) {
-            builder.setParentNameBytes(ByteStringer.wrap(table.getParentName().getBytes()));
+            builder.setParentNameBytes(UnsafeByteOperations.unsafeWrap(table.getParentName().getBytes()));
         }
         if (table.getBaseTableLogicalName() != null) {
-            builder.setBaseTableLogicalNameBytes(ByteStringer.wrap(table.getBaseTableLogicalName().getBytes()));
+            builder.setBaseTableLogicalNameBytes(UnsafeByteOperations.unsafeWrap(table.getBaseTableLogicalName().getBytes()));
         }
         if (table.getDefaultFamilyName() != null) {
-            builder.setDefaultFamilyName(ByteStringer.wrap(table.getDefaultFamilyName().getBytes()));
+            builder.setDefaultFamilyName(UnsafeByteOperations.unsafeWrap(table.getDefaultFamilyName().getBytes()));
         }
         builder.setDisableWAL(table.isWALDisabled());
         builder.setMultiTenant(table.isMultiTenant());
@@ -2293,13 +2292,13 @@ public class PTableImpl implements PTable {
         }
         if (table.getType() == PTableType.VIEW) {
             builder.setViewType(
-                    ByteStringer.wrap(new byte[] { table.getViewType().getSerializedValue() }));
+                    UnsafeByteOperations.unsafeWrap(new byte[] { table.getViewType().getSerializedValue() }));
         }
         if (table.getViewStatement() != null) {
-            builder.setViewStatement(ByteStringer.wrap(PVarchar.INSTANCE.toBytes(table.getViewStatement())));
+            builder.setViewStatement(UnsafeByteOperations.unsafeWrap(PVarchar.INSTANCE.toBytes(table.getViewStatement())));
         }
         for (int i = 0; i < table.getPhysicalNames().size(); i++) {
-            builder.addPhysicalNames(ByteStringer.wrap(table.getPhysicalNames().get(i).getBytes()));
+            builder.addPhysicalNames(UnsafeByteOperations.unsafeWrap(table.getPhysicalNames().get(i).getBytes()));
         }
         builder.setBaseColumnCount(table.getBaseColumnCount());
         builder.setRowKeyOrderOptimizable(table.rowKeyOrderOptimizable());
@@ -2311,7 +2310,7 @@ public class PTableImpl implements PTable {
         }
         builder.setIsAppendOnlySchema(table.isAppendOnlySchema());
         if (table.getImmutableStorageScheme() != null) {
-            builder.setStorageScheme(ByteStringer.wrap(new byte[] {
+            builder.setStorageScheme(UnsafeByteOperations.unsafeWrap(new byte[] {
                     table.getImmutableStorageScheme().getSerializedMetadataValue() }));
         }
         if (table.getEncodedCQCounter() != null) {
@@ -2326,8 +2325,8 @@ public class PTableImpl implements PTable {
             }
         }
         if (table.getEncodingScheme() != null) {
-            builder.setEncodingScheme(ByteStringer
-                    .wrap(new byte[] { table.getEncodingScheme().getSerializedMetadataValue() }));
+            builder.setEncodingScheme(UnsafeByteOperations
+                    .unsafeWrap(new byte[] { table.getEncodingScheme().getSerializedMetadataValue() }));
         }
         if (table.useStatsForParallelization() != null) {
             builder.setUseStatsForParallelization(table.useStatsForParallelization());
@@ -2339,16 +2338,16 @@ public class PTableImpl implements PTable {
         }
         builder.setChangeDetectionEnabled(table.isChangeDetectionEnabled());
         if (table.getSchemaVersion() != null) {
-            builder.setSchemaVersion(ByteStringer.wrap(PVarchar.INSTANCE.toBytes(table.getSchemaVersion())));
+            builder.setSchemaVersion(UnsafeByteOperations.unsafeWrap(PVarchar.INSTANCE.toBytes(table.getSchemaVersion())));
         }
         if (table.getExternalSchemaId() != null) {
-            builder.setExternalSchemaId(ByteStringer.wrap(PVarchar.INSTANCE.toBytes(table.getExternalSchemaId())));
+            builder.setExternalSchemaId(UnsafeByteOperations.unsafeWrap(PVarchar.INSTANCE.toBytes(table.getExternalSchemaId())));
         }
         if (table.getStreamingTopicName() != null) {
-            builder.setStreamingTopicName(ByteStringer.wrap(PVarchar.INSTANCE.toBytes(table.getStreamingTopicName())));
+            builder.setStreamingTopicName(UnsafeByteOperations.unsafeWrap(PVarchar.INSTANCE.toBytes(table.getStreamingTopicName())));
         }
         if (table.getIndexWhere() != null) {
-            builder.setIndexWhere(ByteStringer.wrap(PVarchar.INSTANCE.toBytes(
+            builder.setIndexWhere(UnsafeByteOperations.unsafeWrap(PVarchar.INSTANCE.toBytes(
                     table.getIndexWhere())));
         }
         if (table.getMaxLookbackAge() != null) {
@@ -2358,10 +2357,10 @@ public class PTableImpl implements PTable {
                 table.getCDCIncludeScopes() != null ? table.getCDCIncludeScopes()
                 : Collections.EMPTY_SET));
 
-        builder.setTtl(ByteStringer.wrap(PVarchar.INSTANCE.toBytes(String.valueOf(table.getTTL()))));
+        builder.setTtl(UnsafeByteOperations.unsafeWrap(PVarchar.INSTANCE.toBytes(String.valueOf(table.getTTL()))));
 
         if (table.getRowKeyMatcher() != null) {
-            builder.setRowKeyMatcher(ByteStringer.wrap(table.getRowKeyMatcher()));
+            builder.setRowKeyMatcher(UnsafeByteOperations.unsafeWrap(table.getRowKeyMatcher()));
         }
         return builder.build();
     }

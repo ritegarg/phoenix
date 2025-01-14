@@ -26,10 +26,12 @@ import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.ipc.ServerRpcController;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutationProto;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutationProto.MutationType;
-import org.apache.hadoop.hbase.util.ByteStringer;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto.MutationType;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hbase.thirdparty.com.google.protobuf.ByteString;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.coprocessor.generated.ChildLinkMetaDataProtos.CreateViewAddChildLinkRequest;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos;
 import org.apache.phoenix.coprocessor.generated.PTableProtos;
@@ -37,9 +39,6 @@ import org.apache.phoenix.coprocessor.generated.ServerCachingProtos;
 import org.apache.phoenix.coprocessor.generated.TaskMetaDataProtos
     .TaskMutateRequest;
 import org.apache.phoenix.schema.PTableType;
-
-import com.google.protobuf.ByteString;
-import com.google.protobuf.RpcController;
 
 public class ProtobufUtil {
 
@@ -130,7 +129,7 @@ public class ProtobufUtil {
         List<Mutation> result = new ArrayList<Mutation>();
         for (ByteString mutation : mutations) {
             MutationProto mProto = MutationProto.parseFrom(mutation);
-            result.add(org.apache.hadoop.hbase.protobuf.ProtobufUtil.toMutation(mProto));
+            result.add(org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil.toMutation(mProto));
         }
         return result;
     }
@@ -144,13 +143,13 @@ public class ProtobufUtil {
         } else {
             throw new IllegalArgumentException("Only Put and Delete are supported");
         }
-        return org.apache.hadoop.hbase.protobuf.ProtobufUtil.toMutation(type, mutation);
+        return org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil.toMutation(type, mutation);
     }
     
     public static ServerCachingProtos.ImmutableBytesWritable toProto(ImmutableBytesWritable w) {
         ServerCachingProtos.ImmutableBytesWritable.Builder builder = 
         		ServerCachingProtos.ImmutableBytesWritable.newBuilder();
-        builder.setByteArray(ByteStringer.wrap(w.get()));
+        builder.setByteArray(UnsafeByteOperations.unsafeWrap(w.get()));
         builder.setOffset(w.getOffset());
         builder.setLength(w.getLength());
         return builder.build();

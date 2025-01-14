@@ -1,0 +1,7 @@
+- suite: org.apache.phoenix.pherf.PherfMainIT
+- suite: org.apache.phoenix.end2end.index.ReplicationWithWALAnnotationIT
+- suite: org.apache.phoenix.end2end.transform.TransformMonitorExtendedIT
+- suite: org.apache.phoenix.end2end.index.MutableIndexFailureIT
+- suite: org.apache.phoenix.jdbc.LoggingHAConnectionLimiterIT
+- suite: org.apache.hadoop.hbase.regionserver.wal.WALRecoveryRegionPostOpenIT
+  is_permanent: true

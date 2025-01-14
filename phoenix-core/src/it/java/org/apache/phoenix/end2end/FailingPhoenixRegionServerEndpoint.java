@@ -17,8 +17,8 @@
  */
 package org.apache.phoenix.end2end;
 
-import com.google.protobuf.RpcCallback;
-import com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcCallback;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
 import org.apache.phoenix.coprocessor.PhoenixRegionServerEndpoint;
 import org.apache.phoenix.coprocessor.generated.RegionServerEndpointProtos;
 import org.apache.phoenix.protobuf.ProtobufUtil;

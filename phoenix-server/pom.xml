@@ -24,9 +24,9 @@
   <parent>
     <groupId>org.apache.phoenix</groupId>
     <artifactId>phoenix</artifactId>
-    <version>5.3.0-SNAPSHOT</version>
+    <version>5.3.0-sfdc-13.0.0-SNAPSHOT</version>
   </parent>
-  <artifactId>phoenix-server-${hbase.suffix}</artifactId>
+  <artifactId>phoenix-server</artifactId>
   <name>Phoenix Server JAR</name>
   <description>Phoenix HBase Server Side JAR</description>
   <packaging>jar</packaging>
@@ -126,27 +126,34 @@
             <transformers>
               <transformer
                   implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+<!--              <transformer-->
+<!--                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">-->
+<!--                <resource>csv-bulk-load-config.properties</resource>-->
+<!--                <file>-->
+<!--                  ${project.basedir}/../config/csv-bulk-load-config.properties-->
+<!--                </file>-->
+<!--              </transformer>-->
+<!--              <transformer-->
+<!--                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">-->
+<!--                <resource>README.md</resource>-->
+<!--                <file>${project.basedir}/../README.md</file>-->
+<!--              </transformer>-->
+<!--              <transformer-->
+<!--                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">-->
+<!--                <resource>LICENSE.txt</resource>-->
+<!--                <file>${project.basedir}/../LICENSE</file>-->
+<!--              </transformer>-->
+<!--              <transformer-->
+<!--                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">-->
+<!--                <resource>NOTICE</resource>-->
+<!--                <file>${project.basedir}/../NOTICE</file>-->
+<!--              </transformer>-->
               <transformer
-                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                <resource>csv-bulk-load-config.properties</resource>
-                <file>
-                  ${project.basedir}/../config/csv-bulk-load-config.properties
-                </file>
+                      implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer">
               </transformer>
               <transformer
-                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                <resource>README.md</resource>
-                <file>${project.basedir}/../README.md</file>
-              </transformer>
-              <transformer
-                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                <resource>LICENSE.txt</resource>
-                <file>${project.basedir}/../LICENSE</file>
-              </transformer>
-              <transformer
-                  implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                <resource>NOTICE</resource>
-                <file>${project.basedir}/../NOTICE</file>
+                      implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                <addHeader>false</addHeader>
               </transformer>
             </transformers>
             <relocations>
@@ -493,11 +500,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-protocol</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-protocol-shaded</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -556,20 +558,22 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-      <!-- random version, for exclusion only -->
-      <version>11.0.2</version>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>${zookeeper.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!--needs to be slf4j-log4j12 so we can substitute the version to one >= 1.7.35 with the redirect to reload4j for
+    any slf4j-log4j12 that leaks through -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <version>${slf4j.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.github.stephenc.findbugs</groupId>
       <artifactId>findbugs-annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
       <scope>provided</scope>
     </dependency>
   </dependencies>

@@ -20,7 +20,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.phoenix</groupId>
   <artifactId>phoenix</artifactId>
-  <version>5.3.0-SNAPSHOT</version>
+  <version>5.3.0-sfdc-13.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Phoenix</name>
   <description>A SQL layer over HBase</description>
@@ -40,46 +40,43 @@
   </organization>
 
   <modules>
-    <module>phoenix-hbase-compat-2.6.0</module>
     <module>phoenix-hbase-compat-2.5.4</module>
-    <module>phoenix-hbase-compat-2.5.0</module>
-    <module>phoenix-hbase-compat-2.4.1</module>
     <module>phoenix-core-client</module>
     <module>phoenix-core-server</module>
     <module>phoenix-core</module>
     <module>phoenix-pherf</module>
-    <module>phoenix-tracing-webapp</module>
     <!-- shaded artifact and assembly modules are added in shade-and-assembly profile -->
   </modules>
 
   <parent>
-    <groupId>org.apache</groupId>
-    <artifactId>apache</artifactId>
-    <version>30</version>
+     <groupId>com.salesforce.hbase</groupId>
+     <artifactId>bigdata-parent-pom</artifactId>
+     <version>3.3.2-1.14.164</version>
   </parent>
 
   <scm>
-    <connection>scm:git:https://git-wip-us.apache.org/repos/asf/phoenix.git</connection>
-    <url>https://git-wip-us.apache.org/repos/asf/phoenix.git</url>
-    <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/phoenix.git</developerConnection>
+    <connection>scm:git:git@git.soma.salesforce.com:bigdata-packaging/phoenix.git</connection>
+    <developerConnection>scm:git:git@git.soma.salesforce.com:bigdata-packaging/phoenix.git</developerConnection>
+    <url>https://git.soma.salesforce.com/bigdata-packaging/phoenix.git</url>
   </scm>
 
   <properties>
     <!-- Hadoop and Hbase-thirdparty version -->
     <!-- These are expected to be overridden to conform to cluster versions
     along with hbase.version (defined in profiles) -->
-    <hadoop.version>3.3.6</hadoop.version>
+    <!-- <hadoop.version>3.2.4</hadoop.version> -->
 
-    <phoenix.thirdparty.version>2.1.0</phoenix.thirdparty.version>
+    <phoenix.thirdparty.version>${phoenix-thirdparty.main}</phoenix.thirdparty.version>
     <hbase.suffix>hbase-${hbase.profile}</hbase.suffix>
 
     <!-- This is used by the release script only -->
-    <hbase.profile.list>2.4 2.5.0 2.5 2.6</hbase.profile.list>
+    <hbase.profile.list>2.5</hbase.profile.list>
     <!-- The default hbase versions to build with (override with hbase.version) -->
-    <hbase-2.4.runtime.version>2.4.18</hbase-2.4.runtime.version>
-    <hbase-2.5.0.runtime.version>2.5.3-hadoop3</hbase-2.5.0.runtime.version>
-    <hbase-2.5.runtime.version>2.5.10-hadoop3</hbase-2.5.runtime.version>
-    <hbase-2.6.runtime.version>2.6.1-hadoop3</hbase-2.6.runtime.version>
+      <!-- <hbase-2.4.runtime.version>2.4.18</hbase-2.4.runtime.version>
+      <hbase-2.5.0.runtime.version>2.5.3-hadoop3</hbase-2.5.0.runtime.version>
+      <hbase-2.5.runtime.version>2.5.10-hadoop3</hbase-2.5.runtime.version>
+      <hbase-2.6.runtime.version>2.6.1-hadoop3</hbase-2.6.runtime.version> -->
+    <hbase-2.5.runtime.version>${hbase.two.main}</hbase-2.5.runtime.version>
 
     <compileSource>1.8</compileSource>
     <maven.compiler.source>${compileSource}</maven.compiler.source>
@@ -98,16 +95,14 @@
     <netty-bom.version>4.1.108.Final</netty-bom.version>
     <antlr.version>3.5.2</antlr.version>
     <!-- Only used for tests with HBase 2.1-2.4 -->
-    <reload4j.version>1.2.19</reload4j.version>
-    <log4j2.version>2.18.0</log4j2.version>
+    <!-- <reload4j.version>1.2.19</reload4j.version> -->
+    <!-- <log4j2.version>2.18.0</log4j2.version> -->
     <disruptor.version>3.3.6</disruptor.version>
-    <slf4j.version>1.7.36</slf4j.version>
+    <!-- <slf4j.version>1.7.36</slf4j.version> -->
     <!-- com.google repo will be used except on Aarch64 platform. -->
     <protobuf.group>com.google.protobuf</protobuf.group>
-    <protobuf-java.version>2.5.0</protobuf-java.version>
-    <protoc.version>2.5.0</protoc.version>
-    <commons-io.version>2.14.0</commons-io.version>
-    <commons-lang3.version>3.8</commons-lang3.version>
+    <protoc.version>${hbase.protobuf.version}</protoc.version>
+    <commons-lang.version>3.8</commons-lang.version>
     <commons-csv.version>1.0</commons-csv.version>
     <commons-compress.version>1.26.0</commons-compress.version>
     <sqlline.version>1.9.0</sqlline.version>
@@ -117,13 +112,12 @@
     <commons-codec.version>1.16.0</commons-codec.version>
     <htrace.version>3.1.0-incubating</htrace.version>
     <jodatime.version>2.10.5</jodatime.version>
-    <joni.version>2.1.31</joni.version>
-    <omid.version>1.1.2</omid.version>
+    <joni.version>2.1.34</joni.version>
     <stream.version>2.9.5</stream.version>
     <icu4j.version>72.1</icu4j.version>
     <guice.version>5.1.0</guice.version>
-    <zookeeper.version>3.8.4</zookeeper.version>
-    <curator.version>4.2.0</curator.version>
+    <commons.beanutils.version>1.9.4</commons.beanutils.version>
+    <zookeeper.version>${zookeeper.main}</zookeeper.version>
     <jcodings.version>1.0.55</jcodings.version>
     <jetty.version>9.4.56.v20240826</jetty.version>
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
@@ -158,8 +152,12 @@
     <maven-bundle-plugin.version>5.1.9</maven-bundle-plugin.version>
     <exec-maven-plugin.version>3.1.1</exec-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.3.0</maven-checkstyle-plugin.version>
-    <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <mvel2.version>2.5.2.Final</mvel2.version>
+    <maven-shade-plugin.version>3.3.0</maven-shade-plugin.version>
+    <maven-assembly-plugin.version>3.3.0</maven-assembly-plugin.version>
+    <surefire.version>3.0.0-M6</surefire.version>
+    <maven-javadoc-plugin.version>3.4.0</maven-javadoc-plugin.version>
+    <maven-compiler-plugin.version>3.10.1</maven-compiler-plugin.version>
 
     <!-- Plugin options -->
     <skipParallelStatsEnabledTests>false</skipParallelStatsEnabledTests>
@@ -227,6 +225,9 @@
     <glassfish.el.version>3.0.1-b08</glassfish.el.version>
     <shaded.package>org.apache.phoenix.shaded</shaded.package>
     <hbase.shaded.package>org.apache.hadoop.hbase.shaded</hbase.shaded.package>
+    <!--- We define hbase.protobuf.version in the BPP -->
+    <protobuf.version>${hbase.protobuf.version}</protobuf.version>
+    <os.maven.version>1.5.0.Final</os.maven.version>
   </properties>
 
   <build>
@@ -247,6 +248,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.antlr</groupId>
@@ -312,6 +314,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-assembly-plugin</artifactId>
+          <version>${maven-assembly-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.rat</groupId>
@@ -360,6 +363,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-failsafe-plugin</artifactId>
+          <version>${surefire.version}</version>
           <!-- Common settings for all executions -->
           <configuration>
             <encoding>UTF-8</encoding>
@@ -418,7 +422,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>3.1.1</version>
+          <version>3.3.0</version>
           <configuration>
               <ignoredUnusedDeclaredDependencies>
                 <ignoredUnusedDeclaredDependency>
@@ -476,10 +480,22 @@
                 <goal>analyze-only</goal>
               </goals>
               <configuration>
-                <failOnWarning>true</failOnWarning>
+                <failOnWarning>false</failOnWarning>
               </configuration>
             </execution>
           </executions>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.doxia</groupId>
+              <artifactId>doxia-site-renderer</artifactId>
+              <version>2.0.0-M3</version>
+            </dependency>
+            <dependency>
+              <groupId>org.apache.maven.reporting</groupId>
+              <artifactId>maven-reporting-impl</artifactId>
+              <version>4.0.0-M2</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -491,86 +507,18 @@
           <groupId>org.apache.felix</groupId>
           <artifactId>maven-bundle-plugin</artifactId>
           <version>${maven-bundle-plugin.version}</version>
+          <!-- <version>2.5.0</version> -->
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
           <version>${exec-maven-plugin.version}</version>
+          <!-- <version>1.6.0</version> -->
         </plugin>
         <plugin>
           <groupId>org.xolstice.maven.plugins</groupId>
           <artifactId>protobuf-maven-plugin</artifactId>
           <version>${protobuf.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-enforcer-plugin</artifactId>
-          <dependencies>
-            <dependency>
-              <groupId>de.skuzzle.enforcer</groupId>
-              <artifactId>restrict-imports-enforcer-rule</artifactId>
-              <version>${restrict-imports.enforcer.version}</version>
-            </dependency>
-          </dependencies>
-          <executions>
-            <execution>
-              <id>banned-illegal-imports</id>
-              <phase>process-sources</phase>
-              <goals>
-                <goal>enforce</goal>
-              </goals>
-              <configuration>
-                <rules>
-                  <RestrictImports>
-                    <includeTestCode>true</includeTestCode>
-                    <reason>Use SLF4j for logging</reason>
-                    <bannedImports>
-                      <bannedImport>org.apache.commons.logging.Log</bannedImport>
-                      <bannedImport>org.apache.commons.logging.LogFactory</bannedImport>
-                    </bannedImports>
-                  </RestrictImports>
-                  <RestrictImports>
-                    <includeTestCode>true</includeTestCode>
-                    <reason>Use shaded version in phoenix-thirdparty</reason>
-                    <bannedImports>
-                      <bannedImport>com.google.common.**</bannedImport>
-                    </bannedImports>
-                  </RestrictImports>
-                  <RestrictImports>
-                    <includeTestCode>true</includeTestCode>
-                    <reason>Use shaded version in phoenix-thirdparty</reason>
-                    <bannedImports>
-                      <bannedImport>org.apache.commons.cli.**</bannedImport>
-                      <bannedImport>org.apache.hbase.thirdparty.org.apache.commons.cli.**</bannedImport>
-                    </bannedImports>
-                  </RestrictImports>
-                  <RestrictImports>
-                    <includeTestCode>true</includeTestCode>
-                    <reason>Use commons lang 3</reason>
-                    <bannedImports>
-                      <bannedImport>org.apache.commons.lang.**</bannedImport>
-                    </bannedImports>
-                  </RestrictImports>
-                  <RestrictImports>
-                    <includeTestCode>true</includeTestCode>
-                    <reason>Commons collection is restricted</reason>
-                    <bannedImports>
-                      <bannedImport>org.apache.commons.collections.**</bannedImport>
-                      <!-- If you really need to use commons-collections 4, add as dependency and remove this ban -->
-                      <bannedImport>org.apache.commons.collections4.**</bannedImport>
-                    </bannedImports>
-                  </RestrictImports>
-                  <RestrictImports>
-                    <includeTestCode>true</includeTestCode>
-                    <reason>Use edu.umd.cs.findbugs.annotations</reason>
-                    <bannedImports>
-                      <bannedImport>com.sun.istack.**</bannedImport>
-                    </bannedImports>
-                  </RestrictImports>
-                </rules>
-              </configuration>
-            </execution>
-          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -600,6 +548,13 @@
             </goals>
           </execution>
         </executions>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.doxia</groupId>
+              <artifactId>doxia-site-renderer</artifactId>
+              <version>2.0.0-M3</version>
+            </dependency>
+          </dependencies>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -617,6 +572,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${maven-javadoc-plugin.version}</version>
         <configuration>
           <quiet>true</quiet>
           <links>
@@ -652,6 +608,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
+        <version>2.6</version>
         <executions>
           <execution>
             <phase>prepare-package
@@ -724,108 +681,13 @@
       </dependency>
       <dependency>
         <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-embedded-hbase-2.4</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-embedded-hbase-2.5.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-embedded-hbase-2.5</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-embedded-hbase-2.6</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-lite-hbase-2.4</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-lite-hbase-2.5.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-lite-hbase-2.5</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-client-lite-hbase-2.6</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-server-hbase-2.4</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-server-hbase-2.5.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-server-hbase-2.5</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-server-hbase-2.6</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-mapreduce-byo-shaded-hbase-hbase-2.4</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-mapreduce-byo-shaded-hbase-hbase-2.5.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-mapreduce-byo-shaded-hbase-hbase-2.5</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-mapreduce-byo-shaded-hbase-hbase-2.6</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
         <artifactId>phoenix-pherf</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-tracing-webapp</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.phoenix.thirdparty</groupId>
         <artifactId>phoenix-shaded-guava</artifactId>
         <version>${phoenix.thirdparty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-hbase-compat-2.4.1</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.phoenix</groupId>
-        <artifactId>phoenix-hbase-compat-2.5.0</artifactId>
-        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.phoenix</groupId>
@@ -877,6 +739,10 @@
             <groupId>commons-beanutils</groupId>
             <artifactId>commons-beanutils</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -910,6 +776,10 @@
             <groupId>commons-beanutils</groupId>
             <artifactId>commons-beanutils</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -932,6 +802,10 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1080,6 +954,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
         </exclusions>
         <optional>true</optional>
       </dependency>
@@ -1135,6 +1013,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
 
@@ -1185,6 +1067,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
+            <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
 
@@ -1194,11 +1080,11 @@
         <artifactId>hbase-annotations</artifactId>
         <version>${hbase.version}</version>
       </dependency>
-      <dependency>
-        <groupId>org.apache.hbase</groupId>
-        <artifactId>hbase-protocol</artifactId>
-        <version>${hbase.version}</version>
-      </dependency>
+<!--      <dependency>-->
+<!--        <groupId>org.apache.hbase</groupId>-->
+<!--        <artifactId>hbase-protocol</artifactId>-->
+<!--        <version>${hbase.version}</version>-->
+<!--      </dependency>-->
       <dependency>
         <groupId>org.apache.hbase</groupId>
         <artifactId>hbase-protocol-shaded</artifactId>
@@ -1271,6 +1157,10 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1574,6 +1464,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
 
@@ -1666,11 +1560,6 @@
         <type>pom</type>
       </dependency>
       <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
-        <version>${protobuf-java.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${slf4j.version}</version>
@@ -1709,12 +1598,12 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-lang3</artifactId>
-        <version>${commons-lang3.version}</version>
+        <version>${commons-lang.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
-        <version>${commons-io.version}</version>
+        <version>${commons.io.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.phoenix.thirdparty</groupId>
@@ -1885,68 +1774,8 @@
       <properties>
         <hbase.profile>2.5</hbase.profile>
         <hbase.compat.version>2.5.4</hbase.compat.version>
+        <!-- <hadoop.version>3.2.4</hadoop.version> -->
         <hbase.version>${hbase-2.5.runtime.version}</hbase.version>
-      </properties>
-    </profile>
-    <profile>
-      <!-- PHOENIX-5993 This won't work with the public HBase artifacts -->
-      <id>phoenix-hbase-compat-2.4.1</id>
-      <activation>
-        <property>
-          <name>hbase.profile</name>
-          <value>2.4</value>
-        </property>
-      </activation>
-      <properties>
-        <hbase.profile>2.4</hbase.profile>
-        <hbase.compat.version>2.4.1</hbase.compat.version>
-        <hadoop.version>3.1.4</hadoop.version>
-        <hbase.version>${hbase-2.4.runtime.version}</hbase.version>
-      </properties>
-    </profile>
-    <profile>
-      <!-- This WILL work with the public -hadoop3 artifacts -->
-      <id>phoenix-hbase-compat-2.5.4</id>
-      <activation>
-        <property>
-          <name>hbase.profile</name>
-          <value>2.5</value>
-        </property>
-      </activation>
-      <properties>
-        <hbase.profile>2.5</hbase.profile>
-        <hbase.compat.version>2.5.4</hbase.compat.version>
-        <hbase.version>${hbase-2.5.runtime.version}</hbase.version>
-      </properties>
-    </profile>
-    <profile>
-      <!-- This WILL work with the public -hadoop3 artifacts -->
-      <id>phoenix-hbase-compat-2.5.0</id>
-      <activation>
-        <property>
-          <name>hbase.profile</name>
-          <value>2.5.0</value>
-        </property>
-      </activation>
-      <properties>
-        <hbase.profile>2.5.0</hbase.profile>
-        <hbase.compat.version>2.5.0</hbase.compat.version>
-        <hbase.version>${hbase-2.5.0.runtime.version}</hbase.version>
-      </properties>
-    </profile>
-    <profile>
-      <!-- This WILL work with the public -hadoop3 artifacts -->
-      <id>phoenix-hbase-compat-2.6.0</id>
-      <activation>
-        <property>
-          <name>hbase.profile</name>
-          <value>2.6</value>
-        </property>
-      </activation>
-      <properties>
-        <hbase.profile>2.6</hbase.profile>
-        <hbase.compat.version>2.6.0</hbase.compat.version>
-        <hbase.version>${hbase-2.6.runtime.version}</hbase.version>
       </properties>
     </profile>
     <profile>
@@ -2112,79 +1941,6 @@
           </plugin>
         </plugins>
       </build>
-    </profile>
-    <profile>
-      <id>linux-aarch64</id>
-      <activation>
-        <os>
-          <family>linux</family>
-          <arch>aarch64</arch>
-        </os>
-      </activation>
-      <properties>
-        <!-- PHOENIX-6475 Use custom protoc for Linux ARM64 -->
-        <protobuf.group>org.openlabtesting.protobuf</protobuf.group>
-        <protoc.version>2.5.0.2</protoc.version>
-      </properties>
-    </profile>
-    <profile>
-      <!-- PHOENIX-6806 Use Mac x64 version of protoc for Apple Silicon (aarch64) Macs -->
-      <id>osx-aarch64</id>
-      <activation>
-        <os>
-          <family>mac</family>
-          <arch>aarch64</arch>
-        </os>
-      </activation>
-      <properties>
-        <protoc.arch>osx-x86_64</protoc.arch>
-      </properties>
-    </profile>
-    <profile>
-      <id>build-with-jdk8</id>
-      <activation>
-        <jdk>[1.8,11)</jdk>
-      </activation>
-    </profile>
-    <!-- See PHOENIX-6997 when building with with Java9+ -->
-    <profile>
-      <id>build-with-jdk11</id>
-      <activation>
-        <jdk>[11,17)</jdk>
-      </activation>
-      <properties>
-        <argLine>${phoenix-surefire.jdk11.flags}
-          ${phoenix-surefire.jdk11.tuning.flags}
-          ${phoenix-surefire.argLine}
-          @{jacocoArgLine}</argLine>
-      </properties>
-    </profile>
-    <profile>
-      <id>build-with-jdk17</id>
-      <activation>
-        <jdk>[17,21)</jdk>
-      </activation>
-      <properties>
-        <argLine>${phoenix-surefire.jdk11.flags}
-          ${phoenix-surefire.jdk17.flags}
-          ${phoenix-surefire.jdk17.tuning.flags}
-          ${phoenix-surefire.argLine}
-          @{jacocoArgLine}</argLine>
-      </properties>
-    </profile>
-    <profile>
-      <id>build-with-jdk21</id>
-      <activation>
-        <jdk>[21,)</jdk>
-      </activation>
-      <properties>
-        <argLine>${phoenix-surefire.jdk11.flags}
-          ${phoenix-surefire.jdk17.flags}
-          ${phoenix-surefire.jdk21.flags}
-          ${phoenix-surefire.jdk17.tuning.flags}
-          ${phoenix-surefire.argLine}
-          @{jacocoArgLine}</argLine>
-      </properties>
     </profile>
   </profiles>
   <reporting>

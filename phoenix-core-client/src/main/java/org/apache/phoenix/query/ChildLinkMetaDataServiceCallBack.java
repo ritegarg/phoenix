@@ -18,13 +18,13 @@
 
 package org.apache.phoenix.query;
 
-import com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcUtils.BlockingRpcCallback;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.ipc.ServerRpcController;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutationProto;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto;
 import org.apache.phoenix.coprocessor.generated.ChildLinkMetaDataProtos
     .ChildLinkMetaDataService;
 import org.apache.phoenix.coprocessor.generated.ChildLinkMetaDataProtos

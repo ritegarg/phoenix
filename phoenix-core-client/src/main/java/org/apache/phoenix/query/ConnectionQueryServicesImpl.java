@@ -137,9 +137,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import javax.annotation.concurrent.GuardedBy;
-
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
@@ -177,16 +176,16 @@ import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.ipc.controller.InvalidateMetadataCacheControllerFactory;
 import org.apache.hadoop.hbase.ipc.controller.ServerToServerRpcController;
 import org.apache.hadoop.hbase.ipc.controller.ServerSideRPCControllerFactory;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutationProto;
 import org.apache.hadoop.hbase.security.AccessDeniedException;
 import org.apache.hadoop.hbase.security.User;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto;
 import org.apache.hadoop.hbase.snapshot.SnapshotCreationException;
-import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.VersionInfo;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.compile.MutationPlan;
 import org.apache.phoenix.coprocessor.generated.ChildLinkMetaDataProtos.ChildLinkMetaDataService;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos;
@@ -2446,9 +2445,9 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
                 BlockingRpcCallback<MetaDataResponse> rpcCallback =
                         new BlockingRpcCallback<MetaDataResponse>();
                 GetTableRequest.Builder builder = GetTableRequest.newBuilder();
-                builder.setTenantId(ByteStringer.wrap(tenantIdBytes));
-                builder.setSchemaName(ByteStringer.wrap(schemaBytes));
-                builder.setTableName(ByteStringer.wrap(tableBytes));
+                builder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantIdBytes));
+                builder.setSchemaName(UnsafeByteOperations.unsafeWrap(schemaBytes));
+                builder.setTableName(UnsafeByteOperations.unsafeWrap(tableBytes));
                 builder.setTableTimestamp(tableTimestamp);
                 builder.setClientTimestamp(clientTimestamp);
                 builder.setClientVersion(VersionUtil.encodeVersion(PHOENIX_MAJOR_VERSION, PHOENIX_MINOR_VERSION, PHOENIX_PATCH_NUMBER));
@@ -5894,9 +5893,9 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
                         RpcController controller = getController();
                         BlockingRpcCallback<ClearTableFromCacheResponse> rpcCallback = new BlockingRpcCallback<ClearTableFromCacheResponse>();
                         ClearTableFromCacheRequest.Builder builder = ClearTableFromCacheRequest.newBuilder();
-                        builder.setTenantId(ByteStringer.wrap(tenantId));
-                        builder.setTableName(ByteStringer.wrap(tableName));
-                        builder.setSchemaName(ByteStringer.wrap(schemaName));
+                        builder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantId));
+                        builder.setTableName(UnsafeByteOperations.unsafeWrap(tableName));
+                        builder.setSchemaName(UnsafeByteOperations.unsafeWrap(schemaName));
                         builder.setClientTimestamp(clientTS);
                         builder.setClientVersion(VersionUtil.encodeVersion(PHOENIX_MAJOR_VERSION, PHOENIX_MINOR_VERSION, PHOENIX_PATCH_NUMBER));
                         instance.clearTableFromCache(controller, builder.build(), rpcCallback);
@@ -6189,9 +6188,9 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
                 BlockingRpcCallback<MetaDataResponse> rpcCallback =
                         new BlockingRpcCallback<MetaDataResponse>();
                 GetFunctionsRequest.Builder builder = GetFunctionsRequest.newBuilder();
-                builder.setTenantId(ByteStringer.wrap(tenantIdBytes));
+                builder.setTenantId(UnsafeByteOperations.unsafeWrap(tenantIdBytes));
                 for (Pair<byte[], Long> function: functions) {
-                    builder.addFunctionNames(ByteStringer.wrap(function.getFirst()));
+                    builder.addFunctionNames(UnsafeByteOperations.unsafeWrap(function.getFirst()));
                     builder.addFunctionTimestamps(function.getSecond().longValue());
                 }
                 builder.setClientTimestamp(clientTimestamp);
@@ -6724,9 +6723,9 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
         for (InvalidateServerMetadataCacheRequest request: requests) {
             RegionServerEndpointProtos.InvalidateServerMetadataCache.Builder innerBuilder
                     = RegionServerEndpointProtos.InvalidateServerMetadataCache.newBuilder();
-            innerBuilder.setTenantId(ByteStringer.wrap(request.getTenantId()));
-            innerBuilder.setSchemaName(ByteStringer.wrap(request.getSchemaName()));
-            innerBuilder.setTableName(ByteStringer.wrap(request.getTableName()));
+            innerBuilder.setTenantId(UnsafeByteOperations.unsafeWrap(request.getTenantId()));
+            innerBuilder.setSchemaName(UnsafeByteOperations.unsafeWrap(request.getSchemaName()));
+            innerBuilder.setTableName(UnsafeByteOperations.unsafeWrap(request.getTableName()));
             builder.addInvalidateServerMetadataCacheRequests(innerBuilder.build());
         }
         return builder.build();
