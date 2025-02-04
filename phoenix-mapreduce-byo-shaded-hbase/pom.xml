@@ -22,7 +22,7 @@
   <parent>
     <groupId>org.apache.phoenix</groupId>
     <artifactId>phoenix</artifactId>
-    <version>5.3.0-sfdc-13.0.0-SNAPSHOT</version>
+    <version>5.3.0-sfdc-13.0.0</version>
   </parent>
   <artifactId>phoenix-mapreduce-byo-shaded-hbase</artifactId>
   <name>Phoenix Mapreduce</name>
