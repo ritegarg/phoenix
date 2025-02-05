@@ -526,19 +526,19 @@
     <dependency>
       <groupId>org.apache.hbase.thirdparty</groupId>
       <artifactId>hbase-shaded-netty</artifactId>
-      <version>${hbase-thirdparty.excludeonly.version}</version>
+      <version>${hbase.thirdparty.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase.thirdparty</groupId>
       <artifactId>hbase-shaded-miscellaneous</artifactId>
-      <version>${hbase-thirdparty.excludeonly.version}</version>
+      <version>${hbase.thirdparty.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase.thirdparty</groupId>
       <artifactId>hbase-shaded-protobuf</artifactId>
-      <version>${hbase-thirdparty.excludeonly.version}</version>
+      <version>${hbase.thirdparty.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -555,12 +555,6 @@
       <!-- HBase-shaded already provides this -->
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
-      <version>${zookeeper.version}</version>
       <scope>provided</scope>
     </dependency>
     <!--needs to be slf4j-log4j12 so we can substitute the version to one >= 1.7.35 with the redirect to reload4j for

@@ -552,19 +552,19 @@
     <dependency>
       <groupId>org.apache.hbase.thirdparty</groupId>
       <artifactId>hbase-shaded-netty</artifactId>
-      <version>${hbase-thirdparty.excludeonly.version}</version>
+      <version>${hbase.thirdparty.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase.thirdparty</groupId>
       <artifactId>hbase-shaded-miscellaneous</artifactId>
-      <version>${hbase-thirdparty.excludeonly.version}</version>
+      <version>${hbase.thirdparty.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase.thirdparty</groupId>
       <artifactId>hbase-shaded-protobuf</artifactId>
-      <version>${hbase-thirdparty.excludeonly.version}</version>
+      <version>${hbase.thirdparty.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
