@@ -77,7 +77,6 @@
       <hbase-2.5.runtime.version>2.5.10-hadoop3</hbase-2.5.runtime.version>
       <hbase-2.6.runtime.version>2.6.1-hadoop3</hbase-2.6.runtime.version> -->
     <hbase-2.5.runtime.version>${hbase.two.main}</hbase-2.5.runtime.version>
-
     <compileSource>1.8</compileSource>
     <maven.compiler.source>${compileSource}</maven.compiler.source>
     <maven.compiler.target>${compileSource}</maven.compiler.target>
@@ -1084,7 +1083,31 @@
           </exclusion>
         </exclusions>
       </dependency>
-
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
+        <version>${hadoop.version}</version>
+        <type>test-jar</type>
+        <scope>test</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-reload4j</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
       <!-- HBase dependencies -->
       <dependency>
         <groupId>org.apache.hbase</groupId>
@@ -1835,6 +1858,22 @@
         <hbase.profile>2.5</hbase.profile>
         <hbase.compat.version>2.5.4</hbase.compat.version>
         <!-- <hadoop.version>3.2.4</hadoop.version> -->
+        <hbase.version>${hbase-2.5.runtime.version}</hbase.version>
+      </properties>
+    </profile>
+    <profile>
+      <!-- This WILL work with the public -hadoop3 artifacts -->
+      <id>phoenix-hbase-compat-2.5.4</id>
+      <activation>
+        <property>
+          <name>hbase.profile</name>
+          <value>2.5</value>
+        </property>
+      </activation>
+      <properties>
+        <hbase.profile>2.5</hbase.profile>
+        <hbase.compat.version>2.5.4</hbase.compat.version>
+        <hadoop.version>3.3.6</hadoop.version>
         <hbase.version>${hbase-2.5.runtime.version}</hbase.version>
       </properties>
     </profile>
