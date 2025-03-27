@@ -54,7 +54,9 @@ public interface QueryServices extends SQLCloseable {
             "phoenix.query.client.join.spooling.enabled";
     public static final String SERVER_ORDERBY_SPOOLING_ENABLED_ATTRIB =
             "phoenix.query.server.orderBy.spooling.enabled";
+    @Deprecated
     public static final String HBASE_CLIENT_KEYTAB = "hbase.myclient.keytab";
+    @Deprecated
     public static final String HBASE_CLIENT_PRINCIPAL = "hbase.myclient.principal";
     String QUERY_SERVICES_NAME = "phoenix.query.services.name";
     public static final String SPOOL_DIRECTORY = "phoenix.spool.directory";
@@ -380,6 +382,8 @@ public interface QueryServices extends SQLCloseable {
     public static final String PHOENIX_VIEW_TTL_ENABLED = "phoenix.view.ttl.enabled";
 
     public static final String PHOENIX_VIEW_TTL_TENANT_VIEWS_PER_SCAN_LIMIT = "phoenix.view.ttl.tenant_views_per_scan.limit";
+    // Block mutations based on cluster role record
+    public static final String CLUSTER_ROLE_BASED_MUTATION_BLOCK_ENABLED = "phoenix.cluster.role.based.mutation.block.enabled";
 
     // Before 4.15 when we created a view we included the parent table column metadata in the view
     // metadata. After PHOENIX-3534 we allow SYSTEM.CATALOG to split and no longer store the parent

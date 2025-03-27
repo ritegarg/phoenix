@@ -17,8 +17,10 @@
  */
 package org.apache.phoenix.jdbc;
 
+import static org.apache.phoenix.jdbc.PhoenixHAAdmin.getLocalZkUrl;
 import static org.apache.phoenix.jdbc.PhoenixHAAdminTool.RET_SUCCESS;
-import static org.apache.phoenix.jdbc.PhoenixHAAdminTool.getLocalZkUrl;
+import static org.apache.phoenix.jdbc.PhoenixHAAdmin.HighAvailibilityCuratorProvider;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -46,7 +48,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.phoenix.jdbc.ClusterRoleRecord.ClusterRole;
-import org.apache.phoenix.jdbc.PhoenixHAAdminTool.PhoenixHAAdminHelper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.junit.After;
 import org.junit.Before;
@@ -59,7 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Unit test for {@link PhoenixHAAdminTool} including the helper class {@link PhoenixHAAdminHelper}.
+ * Unit test for {@link PhoenixHAAdminTool} including the helper class {@link PhoenixHAAdmin}.
  *
  * @see PhoenixHAAdminToolIT
  */
@@ -70,12 +71,13 @@ public class PhoenixHAAdminToolTest {
     private static final PrintStream STDOUT = System.out;
     private static final ByteArrayOutputStream STDOUT_CAPTURE = new ByteArrayOutputStream();
 
-    private final PhoenixHAAdminTool.HighAvailibilityCuratorProvider mockHighAvailibilityCuratorProvider = Mockito.mock(PhoenixHAAdminTool.HighAvailibilityCuratorProvider.class);
+    private final HighAvailibilityCuratorProvider mockHighAvailibilityCuratorProvider = Mockito.mock(HighAvailibilityCuratorProvider.class);
 
     /** Use mocked curator since there is no mini-ZK cluster. */
     private final CuratorFramework curator = Mockito.mock(CuratorFramework.class);
     /** HA admin to test for one test case. */
-    private final PhoenixHAAdminHelper admin = new PhoenixHAAdminHelper(ZK1, new Configuration(), mockHighAvailibilityCuratorProvider);
+    private final PhoenixHAAdmin
+            admin = new PhoenixHAAdmin(ZK1, new Configuration(), mockHighAvailibilityCuratorProvider);
 
     private String haGroupName;
     private ClusterRoleRecord recordV1;
@@ -276,14 +278,14 @@ public class PhoenixHAAdminToolTest {
         Configuration conf = HBaseConfiguration.create();
         // default local ZK is 127.0.0.1:2181:/hbase
         final String localZk = String.format("127.0.0.1:%d:%s",
-                HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT, HConstants.DEFAULT_ZOOKEEPER_ZNODE_PARENT);
+                HConstants.DEFAULT_ZOOKEEPER_CLIENT_PORT, HConstants.DEFAULT_ZOOKEEPER_ZNODE_PARENT);
         assertEquals(localZk, getLocalZkUrl(conf));
 
         // set host name only; use default port and znode parent
         final String host = "foobar";
         conf.set(HConstants.ZOOKEEPER_QUORUM, "foobar");
         final String expectedLocalZk = String.format("%s:%d:%s", host,
-                HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT, HConstants.DEFAULT_ZOOKEEPER_ZNODE_PARENT);
+                HConstants.DEFAULT_ZOOKEEPER_CLIENT_PORT, HConstants.DEFAULT_ZOOKEEPER_ZNODE_PARENT);
         assertEquals(expectedLocalZk, getLocalZkUrl(conf));
 
         // set host name and port; use default znode parent
