@@ -175,7 +175,9 @@
                   <!-- See PHOENIX-7118
                  We expect this to come from the unshaded hadoop on the classpath.
                  This won't work if hadoop-shaded-client is used. -->
-                <exclude>org/apache/commons/configuration2/**</exclude>
+                  <exclude>org/apache/commons/configuration2/**</exclude>
+                  <!-- Snappy -->
+                  <exclude>org/xerial/snappy/**</exclude>
                 </excludes>
               </relocation>
 

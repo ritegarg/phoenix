@@ -121,6 +121,13 @@
                   <exclude>webapps/**</exclude>
                 </excludes>
               </filter>
+              <!-- We expect this on the server classpath -->
+              <filter>
+                <artifact>org.xerial.snappy:snappy-java</artifact>
+                <excludes>
+                  <exclude>/**</exclude>
+                </excludes>
+              </filter>
               <!-- Phoenix specific -->
             </filters>
             <transformers>
@@ -185,7 +192,9 @@
                   <!-- See PHOENIX-7118
                  We expect this to come from the unshaded hadoop on the classpath.
                  That is always true for the HBase server classpath -->
-                <exclude>org/apache/commons/configuration2/**</exclude>
+                  <exclude>org/apache/commons/configuration2/**</exclude>
+                  <!-- Snappy -->
+                  <exclude>org/xerial/snappy/**</exclude>
                 </excludes>
               </relocation>
               <!-- We use the relocate-by default settings from -client, instead of relocating
