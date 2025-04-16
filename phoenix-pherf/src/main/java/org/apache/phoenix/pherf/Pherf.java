@@ -162,7 +162,7 @@ public class Pherf {
         }
 
         globalProperties = PherfConstants.create().getProperties(PherfConstants.PHERF_PROPERTIES, false);
-        dropPherfTablesRegEx = command.getOptionValue("drop", null);
+        dropPherfTablesRegEx = command.getOptionValue("drop");
         monitor = command.hasOption("m");
         String
                 monitorFrequency =
@@ -178,7 +178,7 @@ public class Pherf {
         multiTenantWorkload = command.hasOption("mt");
         executeQuerySets = command.hasOption("q");
         zookeeper = command.getOptionValue("z", "localhost");
-        queryHint = command.getOptionValue("hint", null);
+        queryHint = command.getOptionValue("hint");
         isFunctional = command.hasOption("diff");
         isSignOffTest = command.hasOption("isSignOffTest");
         listFiles = command.hasOption("listFiles");
@@ -196,8 +196,8 @@ public class Pherf {
                 command.getOptionValue("writerThreadSize",
                         globalProperties.getProperty("pherf.default.dataloader.threadpool"));
         globalProperties.setProperty("pherf.default.dataloader.threadpool", writerThreadPoolSize);
-        label = command.getOptionValue("label", null);
-        compareResults = command.getOptionValue("compare", null);
+        label = command.getOptionValue("label");
+        compareResults = command.getOptionValue("compare");
         compareType = command.hasOption("useAverageCompareType") ? CompareType.AVERAGE : CompareType.MINIMUM;
         thinDriver = command.hasOption("thin");
         if (thinDriver) {

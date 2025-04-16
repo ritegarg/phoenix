@@ -20,12 +20,12 @@ package org.apache.phoenix.jdbc;
 import static org.apache.hadoop.test.GenericTestUtils.waitFor;
 import static org.apache.phoenix.exception.SQLExceptionCode.CANNOT_ESTABLISH_CONNECTION;
 import static org.apache.phoenix.jdbc.HighAvailabilityGroup.*;
-import static org.apache.phoenix.jdbc.HighAvailabilityTestingUtility.HBaseTestingUtilityPair.doTestWhenOneHBaseDown;
 import static org.apache.phoenix.jdbc.HighAvailabilityTestingUtility.HBaseTestingUtilityPair.doTestWhenOneZKDown;
 import static org.apache.phoenix.jdbc.HighAvailabilityTestingUtility.doTestBasicOperationsWithConnection;
 import static org.apache.phoenix.jdbc.HighAvailabilityTestingUtility.getHighAvailibilityGroup;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
@@ -36,6 +36,8 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -47,6 +49,7 @@ import org.apache.phoenix.end2end.NeedsOwnMiniClusterTest;
 import org.apache.phoenix.exception.SQLExceptionCode;
 import org.apache.phoenix.jdbc.ClusterRoleRecord.ClusterRole;
 import org.apache.phoenix.jdbc.HighAvailabilityTestingUtility.HBaseTestingUtilityPair;
+import org.apache.phoenix.util.PhoenixRuntime;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -73,9 +76,10 @@ public class HighAvailabilityGroupIT {
     /** Client properties to create a connection per test. */
     private Properties clientProperties;
     /** JDBC connection string for this test HA group. */
-    private String jdbcUrl;
+    private String jdbcHAUrl;
     /** Failover HA group for to test. */
     private HighAvailabilityGroup haGroup;
+    private HAURLInfo haURLInfo;
     /** HA Group name for this test. */
     private String haGroupName;
 
@@ -83,6 +87,7 @@ public class HighAvailabilityGroupIT {
     public final TestName testName = new TestName();
     @Rule
     public final Timeout globalTimeout = new Timeout(180, TimeUnit.SECONDS);
+    private final ClusterRoleRecord.RegistryType registryType = ClusterRoleRecord.RegistryType.ZK;
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
@@ -105,8 +110,9 @@ public class HighAvailabilityGroupIT {
 
         // Make first cluster ACTIVE
         CLUSTERS.initClusterRole(haGroupName, HighAvailabilityPolicy.FAILOVER);
-        jdbcUrl = CLUSTERS.getJdbcHAUrl();
-        haGroup = getHighAvailibilityGroup(jdbcUrl,clientProperties);
+        jdbcHAUrl = CLUSTERS.getJdbcHAUrl();
+        haURLInfo = HighAvailabilityGroup.getUrlInfo(jdbcHAUrl, clientProperties);
+        haGroup = getHighAvailibilityGroup(jdbcHAUrl,clientProperties);
     }
 
     @After
@@ -114,10 +120,10 @@ public class HighAvailabilityGroupIT {
         haGroup.close();
         try {
             PhoenixDriver.INSTANCE
-                    .getConnectionQueryServices(CLUSTERS.getJdbcUrl1(), haGroup.getProperties())
+                    .getConnectionQueryServices(CLUSTERS.getJdbcUrl1(haGroup), haGroup.getProperties())
                     .close();
             PhoenixDriver.INSTANCE
-                    .getConnectionQueryServices(CLUSTERS.getJdbcUrl2(), haGroup.getProperties())
+                    .getConnectionQueryServices(CLUSTERS.getJdbcUrl2(haGroup), haGroup.getProperties())
                     .close();
         } catch (Exception e) {
             LOG.error("Fail to tear down the HA group and the CQS. Will ignore", e);
@@ -132,7 +138,7 @@ public class HighAvailabilityGroupIT {
         // Client will get the same HighAvailabilityGroup using the same information as key
         Optional<HighAvailabilityGroup> haGroup2 = Optional.empty();
         try {
-            haGroup2 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
+            haGroup2 = HighAvailabilityGroup.get(jdbcHAUrl, clientProperties);
             assertTrue(haGroup2.isPresent());
             assertSame(haGroup, haGroup2.get());
         } finally {
@@ -145,7 +151,7 @@ public class HighAvailabilityGroupIT {
         clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName3);
         Optional<HighAvailabilityGroup> haGroup3 = Optional.empty();
         try {
-            haGroup3 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
+            haGroup3 = HighAvailabilityGroup.get(jdbcHAUrl, clientProperties);
             assertTrue(haGroup3.isPresent());
             assertNotSame(haGroup, haGroup3.get());
         } finally {
@@ -156,12 +162,173 @@ public class HighAvailabilityGroupIT {
         clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroup.getGroupInfo().getName());
         Optional<HighAvailabilityGroup> haGroup4 = Optional.empty();
         try {
-            haGroup4 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
+            haGroup4 = HighAvailabilityGroup.get(jdbcHAUrl, clientProperties);
             assertTrue(haGroup4.isPresent());
             assertSame(haGroup, haGroup4.get());
         } finally {
             haGroup4.ifPresent(HighAvailabilityGroup::close);
         }
+    }
+
+    /**
+     * Test HAGroup.get() method to get same HAGroups if we have different principals only and different HAGroups
+     * if anything else in the key changes
+     * @throws Exception
+     */
+    @Test
+    public void testGetWithDifferentPrincipals() throws Exception {
+        //Client will get same HAGroup if we have difference in principal only but JDBCURLs should have different
+        //principals
+        assertJDBCUrlForGivenHAGroup(haGroup, haURLInfo, null);
+
+        //Try creating new HAGroup with same params except Principal
+        Optional<HighAvailabilityGroup> haGroup2 = Optional.empty();
+        try {
+            String principal = RandomStringUtils.randomAlphabetic(5);
+            String haUrl2 = CLUSTERS.getJdbcHAUrl(principal);
+            HAURLInfo haURLInfo2 = HighAvailabilityGroup.getUrlInfo(haUrl2, clientProperties);
+            haGroup2 = HighAvailabilityGroup.get(haUrl2, clientProperties);
+            assertTrue(haGroup2.isPresent());
+            //We should get same HAGroup as we have mapping of <HAGroupName, urls> -> HAGroup
+            assertSame(haGroup, haGroup2.get());
+
+            //URLs we are getting for haGroup2 should have newer principal i.e. Current HAURLInfo should have new
+            //principal instead default PRINCIPAL
+            assertJDBCUrlForGivenHAGroup(haGroup2.get(), haURLInfo2, principal);
+        } finally {
+            haGroup2.ifPresent(HighAvailabilityGroup::close);
+        }
+
+        // Client will get a different HighAvailabilityGroup when group name is different and with same principal as
+        // default HAGroup
+        String haGroupName3 = testName.getMethodName() + RandomStringUtils.randomAlphabetic(3);
+        CLUSTERS.initClusterRole(haGroupName3, HighAvailabilityPolicy.FAILOVER);
+        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName3);
+        Optional<HighAvailabilityGroup> haGroup3 = Optional.empty();
+        Optional<HighAvailabilityGroup> haGroup4 = Optional.empty();
+        try {
+            HAURLInfo haurlInfo3 = HighAvailabilityGroup.getUrlInfo(jdbcHAUrl, clientProperties);
+            haGroup3 = HighAvailabilityGroup.get(jdbcHAUrl, clientProperties);
+            assertTrue(haGroup3.isPresent());
+            assertNotSame(haGroup, haGroup3.get());
+
+            assertNotSame(haGroup.getGroupInfo(), haGroup3.get().getGroupInfo());
+
+            //URLs we are getting for haGroup3 should have same principal as default PRINCIPAL.
+            assertJDBCUrlForGivenHAGroup(haGroup3.get(), haurlInfo3, null);
+
+            // should get same ha Group without principal
+            String haUrl4 = CLUSTERS.getJdbcHAUrlWithoutPrincipal();
+            HAURLInfo haURLInfo4 = HighAvailabilityGroup.getUrlInfo(haUrl4, clientProperties);
+            haGroup4 = HighAvailabilityGroup.get(haUrl4, clientProperties);
+            assertTrue(haGroup4.isPresent());
+            assertNotSame(haGroup, haGroup4.get());
+            assertSame(haGroup3.get(), haGroup4.get());
+
+            assertNotSame(haGroup.getGroupInfo(), haGroup4.get().getGroupInfo());
+            assertSame(haGroup3.get().getGroupInfo(), haGroup4.get().getGroupInfo());
+            assertNotEquals(haurlInfo3, haURLInfo4);
+
+        } finally {
+            haGroup3.ifPresent(HighAvailabilityGroup::close);
+            haGroup4.ifPresent(HighAvailabilityGroup::close);
+        }
+
+        // Client will get the same HighAvailabilityGroup using the same information as key again
+        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroup.getGroupInfo().getName());
+        Optional<HighAvailabilityGroup> haGroup5 = Optional.empty();
+        try {
+            //Again using a random principal which should be used now for generating jdbcUrls
+            String principal = RandomStringUtils.randomAlphabetic(5);
+            String haUrl5 = CLUSTERS.getJdbcHAUrl(principal);
+            HAURLInfo haURLInfo5 = HighAvailabilityGroup.getUrlInfo(haUrl5, clientProperties);
+            haGroup5 = HighAvailabilityGroup.get(haUrl5, clientProperties);
+            assertTrue(haGroup5.isPresent());
+            assertSame(haGroup, haGroup5.get());
+
+            //URLs we are getting for haGroup4 should have newer principal i.e. Current HAURLInfo should have new
+            //principal instead default PRINCIPAL
+            assertJDBCUrlForGivenHAGroup(haGroup5.get(), haURLInfo5, principal);
+
+        } finally {
+            haGroup5.ifPresent(HighAvailabilityGroup::close);
+        }
+
+    }
+
+    @Test
+    public void testHAGroupMappings() throws Exception {
+
+        //Try creating new HAGroup with same params except Principal
+        Optional<HighAvailabilityGroup> haGroup2 = Optional.empty();
+        try {
+            String principal = RandomStringUtils.randomAlphabetic(5);
+            String haUrl2 = CLUSTERS.getJdbcHAUrl(principal);
+            HAURLInfo haURLInfo2 = HighAvailabilityGroup.getUrlInfo(haUrl2, clientProperties);
+            haGroup2 = HighAvailabilityGroup.get(haUrl2, clientProperties);
+            assertTrue(haGroup2.isPresent());
+            //We should get same HAGroup as we have mapping of <HAGroupName, urls> -> HAGroup
+            assertSame(haGroup, haGroup2.get());
+            //We should have 2 values on URLS mapping for the given haGroup/haGroup2.
+            assertEquals(2, URLS.get(haGroup.getGroupInfo()).size());
+            assertTrue(URLS.get(haGroup.getGroupInfo()).contains(haURLInfo2));
+
+        } finally {
+            haGroup2.ifPresent(HighAvailabilityGroup::close);
+        }
+
+        //Create 2 more different urls connecting to a different HAGroup
+        String haGroupName3 = testName.getMethodName() + RandomStringUtils.randomAlphabetic(3);
+        CLUSTERS.initClusterRole(haGroupName3, HighAvailabilityPolicy.FAILOVER);
+        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName3);
+        Optional<HighAvailabilityGroup> haGroup3 = Optional.empty();
+        Optional<HighAvailabilityGroup> haGroup4 = Optional.empty();
+        try {
+            HAURLInfo haurlInfo3 = HighAvailabilityGroup.getUrlInfo(jdbcHAUrl, clientProperties);
+            haGroup3 = HighAvailabilityGroup.get(jdbcHAUrl, clientProperties);
+            assertTrue(haGroup3.isPresent());
+            assertNotSame(haGroup, haGroup3.get());
+            assertNotSame(haGroup.getGroupInfo(), haGroup3.get().getGroupInfo());
+            assertEquals(1, URLS.get(haGroup3.get().getGroupInfo()).size());
+
+
+            // should get same ha Group without principal
+            String haUrl4 = CLUSTERS.getJdbcHAUrlWithoutPrincipal();
+            HAURLInfo haURLInfo4 = HighAvailabilityGroup.getUrlInfo(haUrl4, clientProperties);
+            haGroup4 = HighAvailabilityGroup.get(haUrl4, clientProperties);
+            assertTrue(haGroup4.isPresent());
+            assertNotSame(haGroup, haGroup4.get());
+            assertSame(haGroup3.get(), haGroup4.get());
+            assertEquals(2, URLS.get(haGroup4.get().getGroupInfo()).size());
+
+            assertNotEquals(haurlInfo3, haURLInfo4);
+
+        } finally {
+            haGroup3.ifPresent(HighAvailabilityGroup::close);
+            haGroup4.ifPresent(HighAvailabilityGroup::close);
+        }
+
+        // Client will get the same HighAvailabilityGroup using the same information as key again
+        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroup.getGroupInfo().getName());
+        Optional<HighAvailabilityGroup> haGroup5 = Optional.empty();
+        try {
+            String haUrl5 = CLUSTERS.getJdbcHAUrl();
+            HAURLInfo haURLInfo5 = HighAvailabilityGroup.getUrlInfo(haUrl5, clientProperties);
+            haGroup5 = HighAvailabilityGroup.get(haUrl5, clientProperties);
+            assertTrue(haGroup5.isPresent());
+            assertSame(haGroup, haGroup5.get());
+
+            //haURLInfo5 should be same as global one and URLS mapping should not change so
+            //set mapping for global HAGroupInfo should have 2 values
+            assertEquals(2, URLS.get(haGroup.getGroupInfo()).size());
+            assertTrue(URLS.get(haGroup.getGroupInfo()).contains(haURLInfo5));
+            assertEquals(haURLInfo5, haURLInfo);
+
+
+        } finally {
+            haGroup5.ifPresent(HighAvailabilityGroup::close);
+        }
+
     }
 
     /**
@@ -175,21 +342,21 @@ public class HighAvailabilityGroupIT {
         // create cluster role records with different versions on two ZK clusters
         final String zpath = ZKPaths.PATH_SEPARATOR + haGroupName2;
         ClusterRoleRecord record1 = new ClusterRoleRecord(
-                haGroupName2, HighAvailabilityPolicy.FAILOVER,
-                CLUSTERS.getUrl1(), ClusterRole.ACTIVE,
-                CLUSTERS.getUrl2(), ClusterRole.STANDBY,
+                haGroupName2, HighAvailabilityPolicy.FAILOVER, registryType,
+                CLUSTERS.getURL(1, registryType), ClusterRole.ACTIVE,
+                CLUSTERS.getURL(2, registryType), ClusterRole.STANDBY,
                 1);
         CLUSTERS.createCurator1().create().forPath(zpath, ClusterRoleRecord.toJson(record1));
         ClusterRoleRecord record2 = new ClusterRoleRecord(
-                record1.getHaGroupName(), record1.getPolicy(),
-                record1.getZk1(), record1.getRole1(),
-                record1.getZk2(), record1.getRole2(),
+                record1.getHaGroupName(), record1.getPolicy(), record1.getRegistryType(),
+                record1.getUrl1(), record1.getRole1(),
+                record1.getUrl2(), record1.getRole2(),
                 record1.getVersion() + 1); // record2 is newer
         CLUSTERS.createCurator2().create().forPath(zpath, ClusterRoleRecord.toJson(record2));
 
         Optional<HighAvailabilityGroup> haGroup2 = Optional.empty();
         try {
-            haGroup2 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
+            haGroup2 = HighAvailabilityGroup.get(jdbcHAUrl, clientProperties);
             assertTrue(haGroup2.isPresent());
             assertNotSame(haGroup2.get(), haGroup);
             // HA group should see latest version when both role managers are started
@@ -219,7 +386,7 @@ public class HighAvailabilityGroupIT {
       doTestWhenOneZKDown(CLUSTERS.getHBaseCluster1(), () -> {
           HighAvailabilityGroup haGroup2 = null;
           try {
-              haGroup2 = getHighAvailibilityGroup(jdbcUrl, clientProperties);
+              haGroup2 = getHighAvailibilityGroup(jdbcHAUrl, clientProperties);
               LOG.info("Can get the new HA group {} after both ZK clusters restart", haGroup2);
           } finally {
               if (haGroup2 != null) {
@@ -248,7 +415,7 @@ public class HighAvailabilityGroupIT {
         doTestWhenOneZKDown(CLUSTERS.getHBaseCluster1(), () ->
             doTestWhenOneZKDown(CLUSTERS.getHBaseCluster2(), () -> {
                 try {
-                    HighAvailabilityGroup.get(jdbcUrl, clientProperties);
+                    HighAvailabilityGroup.get(jdbcHAUrl, clientProperties);
                     fail("Should have failed because both ZK cluster were shutdown!");
                 } catch (SQLException e) {
                     LOG.info("Got expected SQLException because both ZK clusters are down", e);
@@ -260,7 +427,7 @@ public class HighAvailabilityGroupIT {
 
         HighAvailabilityGroup haGroup2 = null;
         try {
-            haGroup2 = getHighAvailibilityGroup(jdbcUrl, clientProperties);
+            haGroup2 = getHighAvailibilityGroup(jdbcHAUrl, clientProperties);
             LOG.info("Can get the new HA group {} after both ZK clusters restart", haGroup2);
         } finally {
             if (haGroup2 != null) {
@@ -294,7 +461,7 @@ public class HighAvailabilityGroupIT {
     public void testGetShouldFailWithoutClusterRoleData() throws SQLException {
         String invalidHaGroupName = testName.getMethodName() + RandomStringUtils.randomAlphanumeric(3);
         clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, invalidHaGroupName);
-        assertFalse(HighAvailabilityGroup.get(jdbcUrl, clientProperties).isPresent());
+        assertFalse(HighAvailabilityGroup.get(jdbcHAUrl, clientProperties).isPresent());
     }
 
     /**
@@ -302,7 +469,7 @@ public class HighAvailabilityGroupIT {
      */
     @Test
     public void testGetShouldFailWithNonHAJdbcString() {
-        final String oldJdbcString = CLUSTERS.getJdbcUrl1();
+        final String oldJdbcString = CLUSTERS.getJdbcUrl1(haGroup);
         try {
             HighAvailabilityGroup.get(oldJdbcString, clientProperties);
             fail("Should have failed with invalid connection string '" + oldJdbcString + "'");
@@ -317,7 +484,7 @@ public class HighAvailabilityGroupIT {
      */
     @Test
     public void testConnect() throws SQLException {
-        Connection connection = haGroup.connect(clientProperties);
+        Connection connection = haGroup.connect(clientProperties, haURLInfo);
         assertNotNull(connection);
         assertNotNull(connection.unwrap(FailoverPhoenixConnection.class));
     }
@@ -327,12 +494,12 @@ public class HighAvailabilityGroupIT {
      */
     @Test
     public void testConnectToOneCluster() throws SQLException {
-        final String url = CLUSTERS.getJdbcUrl1();
-        PhoenixConnection connection = haGroup.connectToOneCluster(url, clientProperties);
+        final String url = CLUSTERS.getJdbcUrl1(haGroup);
+        PhoenixConnection connection = haGroup.connectToOneCluster(url, clientProperties, haURLInfo);
         assertEquals(url, connection.getURL());
 
         try {
-            haGroup.connectToOneCluster(null, clientProperties);
+            haGroup.connectToOneCluster(null, clientProperties, haURLInfo);
             fail("Should have failed since null is not in any HA group");
         } catch (Exception e) {
             LOG.info("Got expected exception with invalid null host url", e);
@@ -341,9 +508,9 @@ public class HighAvailabilityGroupIT {
         final String randomHostUrl = String.format("%s:%d",
                 RandomStringUtils.randomAlphabetic(4), RandomUtils.nextInt(0,65536));
         try {
-            haGroup.connectToOneCluster(randomHostUrl, clientProperties);
+            haGroup.connectToOneCluster(randomHostUrl, clientProperties, haURLInfo);
             fail("Should have failed since '" + randomHostUrl + "' is not in HA group " + haGroup);
-        } catch (IllegalArgumentException e) {
+        } catch (SQLException e) {
             LOG.info("Got expected exception with invalid host url '{}'", randomHostUrl, e);
         }
     }
@@ -351,18 +518,17 @@ public class HighAvailabilityGroupIT {
     /**
      * Test that it can connect to a given cluster in this HA group after ZK service restarts.
      *
-     * Method {@link HighAvailabilityGroup#connectToOneCluster(String, Properties)} is used by
+     * Method {@link HighAvailabilityGroup#connectToOneCluster(String, Properties, HAURLInfo)} is used by
      * Phoenix HA framework to connect to one specific HBase cluster in this HA group.  The cluster
      * may not necessarily be in ACTIVE role.  For example, parallel HA connection needs to connect
      * to both clusters. This tests that it can connect to a specific ZK cluster after ZK restarts.
      */
     @Test
     public void testConnectToOneClusterAfterZKRestart() throws Exception {
-        final String tableName = testName.getMethodName();
-        CLUSTERS.createTableOnClusterPair(tableName);
+        final String tableName = RandomStringUtils.randomAlphabetic(10);
+        CLUSTERS.createTableOnClusterPair(haGroup, tableName);
 
-        final String url1 = CLUSTERS.getUrl1();
-        final String jdbcUrlToCluster1 = CLUSTERS.getJdbcUrl1();
+        final String jdbcUrlToCluster1 = CLUSTERS.getJdbcUrl1(haGroup);
         doTestWhenOneZKDown(CLUSTERS.getHBaseCluster1(), () -> {
             try {
                 DriverManager.getConnection(jdbcUrlToCluster1);
@@ -376,7 +542,7 @@ public class HighAvailabilityGroupIT {
             doTestBasicOperationsWithConnection(conn, tableName, null);
         }
         // test with HA group to get connection to one cluster
-        try (Connection conn = haGroup.connectToOneCluster(jdbcUrlToCluster1, clientProperties)) {
+        try (Connection conn = haGroup.connectToOneCluster(jdbcUrlToCluster1, clientProperties, haURLInfo)) {
             doTestBasicOperationsWithConnection(conn, tableName, haGroupName);
         }
     }
@@ -386,9 +552,9 @@ public class HighAvailabilityGroupIT {
      */
     @Test
     public void testIsConnectionActive() throws Exception {
-        PhoenixConnection conn1 = haGroup.connectToOneCluster(CLUSTERS.getUrl1(), clientProperties);
+        PhoenixConnection conn1 = haGroup.connectToOneCluster(CLUSTERS.getJdbcUrl1(haGroup), clientProperties, haURLInfo);
         assertTrue(haGroup.isActive(conn1));
-        PhoenixConnection conn2 = haGroup.connectToOneCluster(CLUSTERS.getUrl2(), clientProperties);
+        PhoenixConnection conn2 = haGroup.connectToOneCluster(CLUSTERS.getJdbcUrl2(haGroup), clientProperties, haURLInfo);
         assertFalse(haGroup.isActive(conn2));
 
         CLUSTERS.transitClusterRole(haGroup, ClusterRole.STANDBY, ClusterRole.ACTIVE);
@@ -402,265 +568,47 @@ public class HighAvailabilityGroupIT {
      */
     @Test
     public void testNodeChange() throws Exception {
-        assertEquals(ClusterRole.ACTIVE, haGroup.getRoleRecord().getRole(CLUSTERS.getUrl1()));
-        assertEquals(ClusterRole.STANDBY, haGroup.getRoleRecord().getRole(CLUSTERS.getUrl2()));
+        assertEquals(ClusterRole.ACTIVE, haGroup.getRoleRecord().getRole(CLUSTERS.getURL(1, registryType)));
+        assertEquals(ClusterRole.STANDBY, haGroup.getRoleRecord().getRole(CLUSTERS.getURL(2, registryType)));
 
         CLUSTERS.transitClusterRole(haGroup, ClusterRole.STANDBY, ClusterRole.ACTIVE);
 
-        assertEquals(ClusterRole.STANDBY, haGroup.getRoleRecord().getRole(CLUSTERS.getUrl1()));
-        assertEquals(ClusterRole.ACTIVE, haGroup.getRoleRecord().getRole(CLUSTERS.getUrl2()));
+        assertEquals(ClusterRole.STANDBY, haGroup.getRoleRecord().getRole(CLUSTERS.getURL(1, registryType)));
+        assertEquals(ClusterRole.ACTIVE, haGroup.getRoleRecord().getRole(CLUSTERS.getURL(2, registryType)));
     }
 
-    /**
-     * Test that if STANDBY HBase cluster is down, the connect should work.
-     */
-    @Test
-    public void testCanConnectWhenStandbyHBaseClusterDown() throws Exception {
-        doTestWhenOneHBaseDown(CLUSTERS.getHBaseCluster2(), () -> {
-            // HA group is already initialized
-            Connection connection = haGroup.connect(clientProperties);
-            assertNotNull(connection);
-            assertNotNull(connection.unwrap(FailoverPhoenixConnection.class));
-        });
+    //private helper methods
+    private void assertJDBCUrlForGivenHAGroup(HighAvailabilityGroup haGroup,
+                                              HAURLInfo haURLInfo, String testPrincipal) {
+        String testUrl1 = testPrincipal == null ? CLUSTERS.getJdbcUrl1(haGroup) :
+                CLUSTERS.getJdbcUrl1(haGroup, testPrincipal);
+        String testUrl2 = testPrincipal == null ? CLUSTERS.getJdbcUrl2(haGroup) :
+                CLUSTERS.getJdbcUrl2(haGroup, testPrincipal);
+        String testHAUrl = testPrincipal == null ? CLUSTERS.getJdbcHAUrl() :
+                CLUSTERS.getJdbcHAUrl(testPrincipal);
+
+        //As roleRecord store url in ascending order it might be the case that minicluster2 have
+        //port smaller than minicluster1 and urls are stored in reverse order.
+        assertTrue(getJdbcUrl1ForGivenHAGroup(haGroup, haURLInfo).equals(testUrl1) ||
+                getJdbcUrl1ForGivenHAGroup(haGroup, haURLInfo).equals(testUrl2));
+        assertTrue(getJdbcUrl2ForGivenHAGroup(haGroup, haURLInfo).equals(testUrl1) ||
+                getJdbcUrl2ForGivenHAGroup(haGroup, haURLInfo).equals(testUrl2));
+        assertEquals(testHAUrl, getJdbcHAUrlForGivenHAGroup(haURLInfo));
     }
 
-    /**
-     * Test that if STANDBY ZK cluster is down, the connect should work.
-     *
-     * This differs from {@link #testCanConnectWhenStandbyHBaseClusterDown} because this stops the
-     * ZK cluster, not the HBase cluster.
-     */
-    @Test
-    public void testCanConnectWhenStandbyZKClusterDown() throws Exception {
-        doTestWhenOneZKDown(CLUSTERS.getHBaseCluster2(), () -> {
-            // Clear the HA Cache
-            HighAvailabilityGroup.CURATOR_CACHE.invalidateAll();
-
-            // HA group is already initialized
-            Connection connection = haGroup.connect(clientProperties);
-            assertNotNull(connection);
-            assertNotNull(connection.unwrap(FailoverPhoenixConnection.class));
-        });
+    private String getJdbcUrl1ForGivenHAGroup(HighAvailabilityGroup haGroup, HAURLInfo haURLInfo) {
+        return HighAvailabilityGroup.getJDBCUrl(haGroup.getRoleRecord().getUrl1(), haURLInfo,
+                haGroup.getRoleRecord().getRegistryType());
     }
 
-    /**
-     * Test that if STANDBY HBase cluster is down, connect to new HA group should work.
-     *
-     * This test covers only HBase cluster is down, and both ZK clusters are still healthy so
-     * clients will be able to get latest clusters role record from both clusters. This tests a new
-     * HA group which will get initialized during the STANDBY HBase cluster down time.
-     */
-    @Test
-    public void testCanConnectNewGroupWhenStandbyHBaseClusterDown() throws Exception {
-        doTestWhenOneHBaseDown(CLUSTERS.getHBaseCluster2(), () -> {
-            // get and initialize a new HA group when cluster2 is down
-            String haGroupName2 = testName.getMethodName() + RandomStringUtils.randomAlphabetic(3);
-            clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName2);
-            CLUSTERS.initClusterRole(haGroupName2, HighAvailabilityPolicy.FAILOVER);
-            Optional<HighAvailabilityGroup> haGroup2 = Optional.empty();
-            try {
-                haGroup2 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
-                assertTrue(haGroup2.isPresent());
-                assertNotSame(haGroup2.get(), haGroup);
-                // get a new connection in this new HA group; should be pointing to ACTIVE cluster1
-                try (Connection connection = haGroup2.get().connect(clientProperties)) {
-                    assertNotNull(connection);
-                    assertNotNull(connection.unwrap(FailoverPhoenixConnection.class));
-                }
-            } finally {
-                haGroup2.ifPresent(HighAvailabilityGroup::close);
-            }
-        });
+    private String getJdbcUrl2ForGivenHAGroup(HighAvailabilityGroup haGroup, HAURLInfo haURLInfo) {
+        return HighAvailabilityGroup.getJDBCUrl(haGroup.getRoleRecord().getUrl2(), haURLInfo,
+                haGroup.getRoleRecord().getRegistryType());
     }
 
-    /**
-     * Test that if STANDBY cluster ZK service is down, connect to new HA group should work.
-     *
-     * This differs from {@link #testCanConnectNewGroupWhenStandbyHBaseClusterDown} because this is
-     * testing scenarios when STANDBY ZK cluster is down.
-     */
-    @Test
-    public void testCanConnectNewGroupWhenStandbyZKClusterDown() throws Exception {
-        // get and initialize a new HA group when cluster2 is down
-        String haGroupName2 = testName.getMethodName() + RandomStringUtils.randomAlphabetic(3);
-        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName2);
-        CLUSTERS.initClusterRole(haGroupName2, HighAvailabilityPolicy.FAILOVER);
-
-       doTestWhenOneZKDown(CLUSTERS.getHBaseCluster2(), () -> {
-           Optional<HighAvailabilityGroup> haGroup2 = Optional.empty();
-           try {
-               haGroup2 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
-               assertTrue(haGroup2.isPresent());
-               assertNotSame(haGroup2.get(), haGroup);
-               // get a new connection in this new HA group; should be pointing to ACTIVE cluster1
-               Connection connection = haGroup2.get().connect(clientProperties);
-               assertNotNull(connection);
-               assertNotNull(connection.unwrap(FailoverPhoenixConnection.class));
-           } finally {
-               haGroup2.ifPresent(HighAvailabilityGroup::close);
-           }
-       });
-    }
-
-    /**
-     * Test it can not establish active connection to the ACTIVE HBase cluster if it is down.
-     */
-    @Test
-    public void testCanNotEstablishConnectionWhenActiveHBaseClusterDown() throws Exception {
-        doTestWhenOneHBaseDown(CLUSTERS.getHBaseCluster1(), () -> {
-            try {
-                haGroup.connectActive(clientProperties);
-                fail("Should have failed because ACTIVE HBase cluster is down.");
-            } catch (SQLException e) {
-                LOG.info("Got expected exception when ACTIVE HBase cluster is down", e);
-                assertEquals(CANNOT_ESTABLISH_CONNECTION.getErrorCode(), e.getErrorCode());
-            }
-        });
-    }
-
-     /**
-      * Test that client can not establish connection to when the ACTIVE ZK cluster is down,
-      * while client can establish active connection after active ZK cluster restarts.
-      *
-      * This differs from the {@link #testCanNotEstablishConnectionWhenActiveHBaseClusterDown()}
-      * because this is for ZK cluster down while the other is for HBase cluster down.
-      */
-    @Test
-    public void testConnectActiveWhenActiveZKClusterRestarts() throws Exception {
-        doTestWhenOneZKDown(CLUSTERS.getHBaseCluster1(), () -> {
-            try {
-                haGroup.connectActive(clientProperties);
-                fail("Should have failed because of ACTIVE ZK cluster is down.");
-            } catch (SQLException e) {
-                LOG.info("Got expected exception when ACTIVE ZK cluster is down", e);
-                assertEquals(CANNOT_ESTABLISH_CONNECTION.getErrorCode(), e.getErrorCode());
-            }
-        });
-
-        try (Connection conn = haGroup.connectActive(clientProperties)) {
-            assertNotNull(conn);
-            LOG.info("Successfully connect to HA group {} after restarting ACTIVE ZK", haGroup);
-        } // all other exceptions will fail the test
-    }
-
-    /**
-     * Test when one ZK starts after the HA group has been initialized.
-     *
-     * In this case, both cluster role managers will start and apply discovered cluster role record.
-     */
-    @Test
-    public void testOneZKStartsAfterInit() throws Exception {
-        String haGroupName2 = testName.getMethodName() + RandomStringUtils.randomAlphabetic(3);
-        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName2);
-
-        // create cluster role records with different versions on two ZK clusters
-        final String zpath = ZKPaths.PATH_SEPARATOR + haGroupName2;
-        ClusterRoleRecord record1 = new ClusterRoleRecord(
-                haGroupName2, HighAvailabilityPolicy.FAILOVER,
-                CLUSTERS.getUrl1(), ClusterRole.ACTIVE,
-                CLUSTERS.getUrl2(), ClusterRole.STANDBY,
-                1);
-        CLUSTERS.createCurator1().create().forPath(zpath, ClusterRoleRecord.toJson(record1));
-        ClusterRoleRecord record2 = new ClusterRoleRecord(
-                record1.getHaGroupName(), record1.getPolicy(),
-                record1.getZk1(), record1.getRole1(),
-                record1.getZk2(), record1.getRole2(),
-                record1.getVersion() + 1); // record2 is newer
-        CLUSTERS.createCurator2().create().forPath(zpath, ClusterRoleRecord.toJson(record2));
-
-        doTestWhenOneZKDown(CLUSTERS.getHBaseCluster2(), () -> {
-            Optional<HighAvailabilityGroup> haGroup2 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
-            assertTrue(haGroup2.isPresent());
-            assertNotSame(haGroup2.get(), haGroup);
-            // apparently the HA group cluster role record should be from the healthy cluster
-            assertEquals(record1, haGroup2.get().getRoleRecord());
-        });
-
-        // When ZK2 is connected, its cluster role manager should apply newer cluster role record
-        waitFor(() -> {
-            try {
-                Optional<HighAvailabilityGroup> haGroup2 = HighAvailabilityGroup.get(jdbcUrl, clientProperties);
-                return haGroup2.isPresent() && record2.equals(haGroup2.get().getRoleRecord());
-            } catch (SQLException e) {
-                LOG.warn("Fail to get HA group {}", haGroupName2);
-                return false;
-            }
-        }, 100, 30_000);
-
-        // clean up HA group 2
-        HighAvailabilityGroup.get(jdbcUrl, clientProperties).ifPresent(HighAvailabilityGroup::close);
-    }
-
-    /**
-     * Test that HA connection request will fall back to the first cluster when HA group fails
-     * to initialize due to missing cluster role record (CRR).
-     */
-    @Test
-    public void testFallbackToSingleConnection() throws Exception {
-        final String tableName = testName.getMethodName();
-        CLUSTERS.createTableOnClusterPair(tableName);
-
-        String haGroupName2 = testName.getMethodName() + RandomStringUtils.randomAlphabetic(3);
-        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName2);
-        // no cluster role record for the HA group with name haGroupName2
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, clientProperties)) {
-            // connection is PhoenixConnection instead of HA connection (failover or parallel)
-            assertTrue(conn instanceof PhoenixConnection);
-            // Deterministically talking to the first cluster: first means "smaller" URL
-            String firstClusterUrl = CLUSTERS.getUrl1();
-            if (CLUSTERS.getUrl1().compareTo(CLUSTERS.getUrl2()) > 0) {
-                firstClusterUrl = CLUSTERS.getUrl2();
-            }
-            assertEquals(firstClusterUrl, ((PhoenixConnection) conn).getURL());
-            doTestBasicOperationsWithConnection(conn, tableName, haGroupName2);
-        }
-
-        // disable fallback feature even if the cluster role record is missing for this group
-        clientProperties.setProperty(PHOENIX_HA_SHOULD_FALLBACK_WHEN_MISSING_CRR_KEY, "false");
-        try {
-            DriverManager.getConnection(jdbcUrl, clientProperties);
-            fail("Should have failed when disabling fallback to single cluster");
-        } catch (SQLException e) {
-            LOG.info("Got expected exception when disabling fallback");
-        }
-        clientProperties.remove(PHOENIX_HA_SHOULD_FALLBACK_WHEN_MISSING_CRR_KEY);
-
-        // Now create the cluster role record
-        CLUSTERS.initClusterRole(haGroupName2, HighAvailabilityPolicy.FAILOVER);
-        // And invalidate the negative cache. We are doing it manually because the default time for
-        // expireAfterWrite is too long for testing. We do not need to test the cache per se.
-        HighAvailabilityGroup.MISSING_CRR_GROUPS_CACHE.invalidateAll();
-
-        // After it is expired in the negative cache, the HA group will start serving HA connections
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, clientProperties)) {
-           assertTrue(conn instanceof FailoverPhoenixConnection);
-           doTestBasicOperationsWithConnection(conn, tableName, haGroupName2);
-        }
-    }
-
-    /**
-     * Test that HA connection request will not fall back to the first cluster when one ZK is down.
-     */
-    @Test
-    public void testNotFallbackToSingleConnection() throws Exception {
-        final String tableName = testName.getMethodName();
-        CLUSTERS.createTableOnClusterPair(tableName);
-        String haGroupName2 = testName.getMethodName() + RandomStringUtils.randomAlphabetic(3);
-        clientProperties.setProperty(PHOENIX_HA_GROUP_ATTR, haGroupName2);
-
-        doTestWhenOneZKDown(CLUSTERS.getHBaseCluster2(), () -> {
-            try {
-                DriverManager.getConnection(jdbcUrl, clientProperties);
-                fail("Should have failed since one HA group can not initialized. Not falling back");
-            } catch (SQLException e) {
-                LOG.info("Got expected exception as HA group fails to initialize", e);
-            }
-        });
-
-        // After cluster 2 is up and running again, fallback to single cluster will work
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, clientProperties)) {
-            // connection is PhoenixConnection instead of HA connection (failover or parallel)
-            assertTrue(conn instanceof PhoenixConnection);
-        }
+    private String getJdbcHAUrlForGivenHAGroup(HAURLInfo haURLInfo) {
+        return HighAvailabilityGroup.getJDBCUrl(String.format("[%s|%s]", CLUSTERS.getZkUrl1(),
+                        CLUSTERS.getZkUrl2()), haURLInfo,
+                            ClusterRoleRecord.RegistryType.ZK);
     }
 }

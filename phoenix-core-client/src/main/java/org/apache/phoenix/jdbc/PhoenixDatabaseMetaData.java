@@ -399,6 +399,8 @@ public class PhoenixDatabaseMetaData implements DatabaseMetaData {
     public static final byte[] TTL_BYTES = Bytes.toBytes(TTL);
     public static final int TTL_NOT_DEFINED = 0;
     public static final int DEFAULT_TTL = HConstants.FOREVER;
+    public static final String FOREVER_TTL = "FOREVER";
+    public static final String NONE_TTL = "NONE";
     public static final String PHOENIX_TTL = "PHOENIX_TTL";
     public static final byte[] PHOENIX_TTL_BYTES = Bytes.toBytes(PHOENIX_TTL);
     public static final String PHOENIX_TTL_HWM = "PHOENIX_TTL_HWM";
@@ -461,6 +463,7 @@ public class PhoenixDatabaseMetaData implements DatabaseMetaData {
             SchemaUtil.getTableName(SYSTEM_CATALOG_SCHEMA, SYSTEM_CDC_STREAM_TABLE);
     public static final String STREAM_NAME = "STREAM_NAME";
     public static final String STREAM_STATUS = "STREAM_STATUS";
+    public static final String STREAM_TYPE = "STREAM_TYPE";
     public static final String PARTITION_ID = "PARTITION_ID";
     public static final String PARENT_PARTITION_ID = "PARENT_PARTITION_ID";
     public static final String PARTITION_START_TIME = "PARTITION_START_TIME";

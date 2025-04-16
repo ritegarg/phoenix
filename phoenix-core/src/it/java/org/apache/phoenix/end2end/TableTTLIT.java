@@ -22,14 +22,12 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.phoenix.coprocessorclient.BaseScannerRegionObserverConstants;
+import org.apache.phoenix.hbase.index.IndexRegionObserver;
+import org.apache.phoenix.jdbc.PhoenixResultSet;
 import org.apache.phoenix.query.BaseTest;
 import org.apache.phoenix.query.QueryServices;
 import org.apache.phoenix.thirdparty.com.google.common.collect.Maps;
-import org.apache.phoenix.util.EnvironmentEdgeManager;
-import org.apache.phoenix.util.ManualEnvironmentEdge;
-import org.apache.phoenix.util.PhoenixRuntime;
-import org.apache.phoenix.util.ReadOnlyProps;
-import org.apache.phoenix.util.TestUtil;
+import org.apache.phoenix.util.*;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -52,8 +50,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @Category(NeedsOwnMiniClusterTest.class)
 @RunWith(Parameterized.class)
@@ -338,14 +335,205 @@ public class TableTTLIT extends BaseTest {
             updateColumn(conn, tableName, "a2", 3, "col3");
             updateColumn(conn, tableName, "a3", 5, "col5");
             conn.commit();
+            String dql = "SELECT * from " + tableName;
+            ResultSet rs = conn.createStatement().executeQuery(dql);
+            // check that all older columns are masked
+            while (rs.next()) {
+                String id = rs.getString(1);
+                int updatedColIndex = 0;
+                if (id.equals("a1")) {
+                    updatedColIndex = 2;
+                } else if (id.equals("a2")) {
+                    updatedColIndex = 3;
+                } else if (id.equals("a3")) {
+                    updatedColIndex = 5;
+                } else {
+                    fail(String.format("Got unexpected row key %s", id));
+                }
+                for (int colIndex = 1; colIndex <= MAX_COLUMN_INDEX; ++colIndex) {
+                    if (colIndex != updatedColIndex) {
+                        assertNull(rs.getString(colIndex + 1));
+                    } else {
+                        assertNotNull(rs.getString(colIndex + 1));
+                    }
+                }
+            }
             flush(TableName.valueOf(tableName));
             majorCompact(TableName.valueOf(tableName));
-            String dql = "SELECT count(*) from " + tableName;
-            ResultSet rs = conn.createStatement().executeQuery(dql);
+            dql = "SELECT count(*) from " + tableName;
+            rs = conn.createStatement().executeQuery(dql);
             assertTrue(rs.next());
             assertEquals(3, rs.getInt(1));
         }
     }
+
+    @Test
+    public void testMaskingGapAnalysis() throws Exception {
+        // for the purpose of this test only considering cases when maxlookback is 0
+        if (tableLevelMaxLooback == null || tableLevelMaxLooback != 0) {
+            return;
+        }
+        try (Connection conn = DriverManager.getConnection(getUrl())) {
+            String tableName = generateUniqueName();
+            createTable(tableName);
+            long startTime = System.currentTimeMillis() + 1000;
+            startTime = (startTime / 1000) * 1000;
+            EnvironmentEdgeManager.injectEdge(injectEdge);
+            injectEdge.setValue(startTime);
+            updateRow(conn, tableName, "a1"); // min timestamp
+            conn.commit();
+            String dql = String.format("SELECT * from %s where id='%s'", tableName, "a1");
+            String [] colValues = new String[MAX_COLUMN_INDEX + 1];
+            try (ResultSet rs = conn.createStatement().executeQuery(dql)) {
+                assertTrue(rs.next());
+                for (int i = 1; i <= MAX_COLUMN_INDEX; ++i) {
+                    // initialize the column values to the current row version
+                    colValues[i] = rs.getString("val" + i);
+                }
+            }
+            for (int iter = 1; iter <= 20; ++iter) {
+                injectEdge.incrementValue(1);
+                int colIndex = RAND.nextInt(MAX_COLUMN_INDEX) + 1;
+                String value = Integer.toString(RAND.nextInt(1000));
+                updateColumn(conn, tableName, "a1", colIndex, value);
+                conn.commit();
+                colValues[colIndex] = value;
+
+                injectEdge.incrementValue(ttl * 1000);
+                colIndex = RAND.nextInt(MAX_COLUMN_INDEX) + 1;
+                value = Integer.toString(RAND.nextInt(1000));
+                updateColumn(conn, tableName, "a1", colIndex, value);
+                conn.commit();
+                colValues[colIndex] = value;
+
+                if (iter % 5 == 0) {
+                    // every 5th iteration introduce a gap
+                    // first verify the current row
+                    try (ResultSet rs = conn.createStatement().executeQuery(dql)) {
+                        assertTrue(rs.next());
+                        for (int i = 1; i <= MAX_COLUMN_INDEX; ++i) {
+                            Assert.assertEquals(colValues[i], rs.getString("val" + i));
+                        }
+                    }
+                    // inject the gap
+                    injectEdge.incrementValue(ttl*1000 + RAND.nextInt(ttl*1000));
+                    // row expires after the gap so reset the col values to null
+                    colValues = new String[MAX_COLUMN_INDEX + 1];
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testMultipleUpdatesToSingleColumn() throws Exception {
+        // for the purpose of this test only considering cases when maxlookback is 0
+        if (tableLevelMaxLooback == null || tableLevelMaxLooback != 0) {
+            return;
+        }
+        try (Connection conn = DriverManager.getConnection(getUrl())) {
+            String tableName = generateUniqueName();
+            createTable(tableName);
+            long startTime = System.currentTimeMillis() + 1000;
+            startTime = (startTime / 1000) * 1000;
+            EnvironmentEdgeManager.injectEdge(injectEdge);
+            injectEdge.setValue(startTime);
+            updateRow(conn, tableName, "a1");
+            injectEdge.incrementValue(1);
+            for (int i = 0; i < 15; ++i) {
+                updateColumn(conn, tableName, "a1", 2, "col2_" + i);
+                conn.commit();
+                injectEdge.incrementValue((ttl / 10) * 1000);
+            }
+            conn.commit();
+            String dql = "select * from " + tableName + " where id='a1'";
+            try (ResultSet rs = conn.createStatement().executeQuery(dql)) {
+                while (rs.next()) {
+                    for (int col = 1; col <= MAX_COLUMN_INDEX + 1; col++) {
+                        System.out.println(rs.getString(col));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testDeleteFamilyVersion() throws Exception {
+        // for the purpose of this test only considering cases when maxlookback is 0
+        if (tableLevelMaxLooback == null || tableLevelMaxLooback != 0) {
+            return;
+        }
+        if (multiCF == true) {
+            return;
+        }
+        try (Connection conn = DriverManager.getConnection(getUrl())) {
+            String tableName = "T_" + generateUniqueName();
+            createTable(tableName);
+            String indexName = "I_" + generateUniqueName();
+            String indexDDL = String.format("create index %s on %s (val1) include (val2, val3)",
+                    indexName, tableName);
+            conn.createStatement().execute(indexDDL);
+            updateRow(conn, tableName, "a1");
+            String indexColumnValue;
+            String expectedValue;
+            String dql = "select val1, val2 from " + tableName + " where id = 'a1'";
+            try (ResultSet rs = conn.createStatement().executeQuery(dql)) {
+                PhoenixResultSet prs = rs.unwrap(PhoenixResultSet.class);
+                String explainPlan = QueryUtil.getExplainPlan(prs.getUnderlyingIterator());
+                assertFalse(explainPlan.contains(indexName));
+                assertTrue(rs.next());
+                indexColumnValue = rs.getString(1);
+                expectedValue = rs.getString(2);
+                assertFalse(rs.next());
+            }
+            // Insert an orphan index row by failing data table update
+            IndexRegionObserver.setFailDataTableUpdatesForTesting(true);
+            try {
+                updateColumn(conn, tableName, "a1", 2, "col2_xyz");
+                conn.commit();
+                fail("An exception should have been thrown");
+            } catch (Exception ignored) {
+                // Ignore the exception
+            } finally {
+                IndexRegionObserver.setFailDataTableUpdatesForTesting(false);
+            }
+            // Insert another orphan index row
+            IndexRegionObserver.setFailDataTableUpdatesForTesting(true);
+            try {
+                updateColumn(conn, tableName, "a1", 2, "col2_abc");
+                conn.commit();
+                fail("An exception should have been thrown");
+            } catch (Exception ignored) {
+                // Ignore the exception
+            } finally {
+                IndexRegionObserver.setFailDataTableUpdatesForTesting(false);
+            }
+            TestUtil.dumpTable(conn, TableName.valueOf(indexName));
+            // do a read on the index which should trigger a read repair
+            dql = "select val2 from " + tableName + " where val1 = '" + indexColumnValue + "'";
+            try (ResultSet rs = conn.createStatement().executeQuery(dql)) {
+                PhoenixResultSet prs = rs.unwrap(PhoenixResultSet.class);
+                String explainPlan = QueryUtil.getExplainPlan(prs.getUnderlyingIterator());
+                assertTrue(explainPlan.contains(indexName));
+                assertTrue(rs.next());
+                assertEquals(rs.getString(1), expectedValue);
+                assertFalse(rs.next());
+            }
+            TestUtil.dumpTable(conn, TableName.valueOf(indexName));
+            flush(TableName.valueOf(indexName));
+            majorCompact(TableName.valueOf(indexName));
+            TestUtil.dumpTable(conn, TableName.valueOf(indexName));
+            // run the same query again after compaction
+            try (ResultSet rs = conn.createStatement().executeQuery(dql)) {
+                PhoenixResultSet prs = rs.unwrap(PhoenixResultSet.class);
+                String explainPlan = QueryUtil.getExplainPlan(prs.getUnderlyingIterator());
+                assertTrue(explainPlan.contains(indexName));
+                assertTrue(rs.next());
+                assertEquals(rs.getString(1), expectedValue);
+                assertFalse(rs.next());
+            }
+        }
+    }
+
 
     private void flush(TableName table) throws IOException {
         Admin admin = getUtility().getAdmin();

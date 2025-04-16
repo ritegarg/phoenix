@@ -18,7 +18,9 @@
 
 package org.apache.phoenix.end2end;
 
-import org.apache.phoenix.coprocessor.BaseScannerRegionObserver;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.phoenix.coprocessorclient.BaseScannerRegionObserverConstants;
 import org.apache.phoenix.query.QueryServices;
 import org.apache.phoenix.schema.types.PInteger;
@@ -29,11 +31,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @Category(NeedsOwnMiniClusterTest.class)
 public class ViewTTLWithLongViewIndexEnabledIT extends BaseViewTTLIT {
+
+    public ViewTTLWithLongViewIndexEnabledIT(boolean useCondExpression) {
+        super(useCondExpression);
+    }
 
     @BeforeClass
     public static final void doSetup() throws Exception {
@@ -90,12 +93,16 @@ public class ViewTTLWithLongViewIndexEnabledIT extends BaseViewTTLIT {
         super.testMajorCompactWithVariousTenantIdTypesAndRegions(PLong.INSTANCE);
     }
     @Test
+    public void testMajorCompactTenantViewsWithVariousPKTypesAndSortOrder() throws Exception {
+        super.testMajorCompactTenantViewsWithVariousPKTypesAndSortOrder();
+    }
+    @Test
     public void testMajorCompactWhenTTLSetForSomeTenants() throws Exception {
         super.testMajorCompactWhenTTLSetForSomeTenants();
     }
     @Test
-    public void testTenantViewsWIthOverlappingRowPrefixes() throws Exception {
-        super.testTenantViewsWIthOverlappingRowPrefixes();
+    public void testTenantViewsWithOverlappingRowPrefixes() throws Exception {
+        super.testTenantViewsWithOverlappingRowPrefixes();
     }
     @Test
     public void testMajorCompactWithGlobalAndTenantViewHierarchy() throws Exception {

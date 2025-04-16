@@ -59,22 +59,26 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.client.CompactionState;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.CoprocessorDescriptor;
 import org.apache.hadoop.hbase.client.CoprocessorDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Delete;
 
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
@@ -128,6 +132,7 @@ import org.apache.phoenix.filter.SingleKeyValueComparisonFilter;
 import org.apache.phoenix.jdbc.PhoenixConnection;
 import org.apache.phoenix.jdbc.PhoenixDatabaseMetaData;
 import org.apache.phoenix.jdbc.PhoenixPreparedStatement;
+import org.apache.phoenix.jdbc.PhoenixResultSet;
 import org.apache.phoenix.jdbc.PhoenixStatement;
 import org.apache.phoenix.parse.FilterableStatement;
 import org.apache.phoenix.parse.SQLParser;
@@ -147,6 +152,8 @@ import org.apache.phoenix.schema.PTable.QualifierEncodingScheme;
 import org.apache.phoenix.schema.PTableKey;
 import org.apache.phoenix.schema.RowKeyValueAccessor;
 import org.apache.phoenix.schema.SortOrder;
+import org.apache.phoenix.schema.TTLExpression;
+import org.apache.phoenix.schema.TTLExpressionFactory;
 import org.apache.phoenix.schema.TableRef;
 import org.apache.phoenix.schema.stats.GuidePostsInfo;
 import org.apache.phoenix.schema.stats.GuidePostsKey;
@@ -220,7 +227,7 @@ public class TestUtil {
     public final static String ROW7 = "00B723122312312";
     public final static String ROW8 = "00B823122312312";
     public final static String ROW9 = "00C923122312312";
-    
+
     public final static String PARENTID1 = "0500x0000000001";
     public final static String PARENTID2 = "0500x0000000002";
     public final static String PARENTID3 = "0500x0000000003";
@@ -230,9 +237,9 @@ public class TestUtil {
     public final static String PARENTID7 = "0500x0000000007";
     public final static String PARENTID8 = "0500x0000000008";
     public final static String PARENTID9 = "0500x0000000009";
-    
+
     public final static List<String> PARENTIDS = Lists.newArrayList(PARENTID1, PARENTID2, PARENTID3, PARENTID4, PARENTID5, PARENTID6, PARENTID7, PARENTID8, PARENTID9);
-    
+
     public final static String ENTITYHISTID1 = "017x00000000001";
     public final static String ENTITYHISTID2 = "017x00000000002";
     public final static String ENTITYHISTID3 = "017x00000000003";
@@ -244,7 +251,7 @@ public class TestUtil {
     public final static String ENTITYHISTID9 = "017x00000000009";
 
     public final static List<String> ENTITYHISTIDS = Lists.newArrayList(ENTITYHISTID1, ENTITYHISTID2, ENTITYHISTID3, ENTITYHISTID4, ENTITYHISTID5, ENTITYHISTID6, ENTITYHISTID7, ENTITYHISTID8, ENTITYHISTID9);
-    
+
     public static final String LOCALHOST = "localhost";
     public static final String PHOENIX_JDBC_URL = JDBC_PROTOCOL + JDBC_PROTOCOL_SEPARATOR + LOCALHOST + JDBC_PROTOCOL_TERMINATOR + PHOENIX_TEST_DRIVER_URL_PARAM;
     public static final String PHOENIX_CONNECTIONLESS_JDBC_URL = JDBC_PROTOCOL + JDBC_PROTOCOL_SEPARATOR + CONNECTIONLESS + JDBC_PROTOCOL_TERMINATOR + PHOENIX_TEST_DRIVER_URL_PARAM;
@@ -897,7 +904,7 @@ public class TestUtil {
             if (table.isTransactional()) {
                 mutationState.commit();
             }
-        
+
             Admin hbaseAdmin = services.getAdmin();
             hbaseAdmin.flush(TableName.valueOf(tableName));
             hbaseAdmin.majorCompact(TableName.valueOf(tableName));
@@ -910,7 +917,7 @@ public class TestUtil {
                 scan.withStartRow(markerRowKey);
                 scan.withStopRow(Bytes.add(markerRowKey, new byte[]{0}));
                 scan.setRaw(true);
-        
+
                 try (Table htableForRawScan = services.getTable(Bytes.toBytes(tableName))) {
                     ResultScanner scanner = htableForRawScan.getScanner(scan);
                     List<Result> results = Lists.newArrayList(scanner);
@@ -973,7 +980,6 @@ public class TestUtil {
     }
 
     public static int getRawRowCount(Table table) throws IOException {
-        dumpTable(table);
         return getRowCount(table, true);
     }
 
@@ -1002,30 +1008,54 @@ public class TestUtil {
                 Cell current = null;
                 while (cellScanner.advance()) {
                     current = cellScanner.current();
-                    cellCount.addCell(Bytes.toString(CellUtil.cloneRow(current)));
+                    cellCount.addOrUpdateCell(Bytes.toString(CellUtil.cloneRow(current)));
                 }
             }
         }
         return cellCount;
     }
 
-    static class CellCount {
+    public static class CellCount {
         private Map<String, Integer> rowCountMap = new HashMap<String, Integer>();
 
-        void addCell(String key) {
+        public void addOrUpdateCell(String key) {
+            addOrUpdateCells(key, 1);
+        }
+
+        public void addOrUpdateCells(String key, int count) {
             if (rowCountMap.containsKey(key)) {
-                rowCountMap.put(key, rowCountMap.get(key) + 1);
+                rowCountMap.put(key, rowCountMap.get(key) + count);
             } else {
-                rowCountMap.put(key, 1);
+                insertRow(key, count);
             }
         }
 
-        int getCellCount(String key) {
+        public void insertRow(String key, int count) {
+            rowCountMap.put(key, count);
+        }
+
+        public void removeRow(String key) {
+            rowCountMap.remove(key);
+        }
+
+        public int getCellCount(String key) {
             if (rowCountMap.containsKey(key)) {
                 return rowCountMap.get(key);
             } else {
                 return 0;
             }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            CellCount other = (CellCount) o;
+            return rowCountMap.equals(other.rowCountMap);
         }
     }
 
@@ -1206,6 +1236,28 @@ public class TestUtil {
         return rs.getLong(1);
     }
 
+    public static long getRowCount(Connection conn, String tableName, boolean skipIndex)
+            throws SQLException {
+        String query = String.format("SELECT %s count(*) FROM %s",
+                (skipIndex ? "/*+ NO_INDEX */" : ""), tableName);
+        try(ResultSet rs = conn.createStatement().executeQuery(query)) {
+            assertTrue(rs.next());
+            return rs.getLong(1);
+        }
+    }
+
+    public static long getRowCountFromIndex(Connection conn, String tableName, String indexName)
+            throws SQLException {
+        String query = String.format("SELECT count(*) FROM %s", tableName);
+        try(ResultSet rs = conn.createStatement().executeQuery(query)) {
+            PhoenixResultSet prs = rs.unwrap(PhoenixResultSet.class);
+            String explainPlan = QueryUtil.getExplainPlan(prs.getUnderlyingIterator());
+            assertTrue(explainPlan.contains(indexName));
+            assertTrue(rs.next());
+            return rs.getLong(1);
+        }
+    }
+
     public static void addCoprocessor(Connection conn, String tableName, Class coprocessorClass) throws Exception {
         int priority = QueryServicesOptions.DEFAULT_COPROCESSOR_PRIORITY + 100;
         ConnectionQueryServices services = conn.unwrap(PhoenixConnection.class).getQueryServices();
@@ -1354,14 +1406,16 @@ public class TestUtil {
 
     public static void assertTableHasTtl(Connection conn, TableName tableName, int ttl, boolean phoenixTTLEnabled)
         throws SQLException, IOException {
-        long tableTTL = -1;
+        TTLExpression tableTTL;
         if (phoenixTTLEnabled) {
             tableTTL = conn.unwrap(PhoenixConnection.class).getTable(new PTableKey(null,
-                    tableName.getNameAsString())).getTTL();
+                    tableName.getNameAsString())).getTTLExpression();
         } else {
-            tableTTL = getColumnDescriptor(conn, tableName).getTimeToLive();
+            tableTTL = TTLExpressionFactory.create(
+                    getColumnDescriptor(conn, tableName).getTimeToLive());
         }
-        Assert.assertEquals(ttl, tableTTL);
+        TTLExpression expectedTTL = TTLExpressionFactory.create(ttl);
+        Assert.assertEquals(expectedTTL, tableTTL);
     }
 
     public static void assertTableHasVersions(Connection conn, TableName tableName, int versions)
@@ -1397,6 +1451,14 @@ public class TestUtil {
         CellCount cellCount = getCellCount(table, true);
         return cellCount.getCellCount(Bytes.toString(row));
     }
+
+    public static CellCount getRawCellCount(Connection conn, TableName tableName)
+            throws IOException, SQLException {
+        ConnectionQueryServices cqs = conn.unwrap(PhoenixConnection.class).getQueryServices();
+        Table table = cqs.getTable(tableName.getName());
+        return getCellCount(table, true);
+    }
+
     public static void assertRawCellCount(Connection conn, TableName tableName,
                                           byte[] row, int expectedCellCount)
         throws SQLException, IOException {
@@ -1448,6 +1510,85 @@ public class TestUtil {
         // We cannot use java.nio.file.Files.createTempDirectory(null),
         // because that caches the value of "java.io.tmpdir" on class load.
         return Files.createTempDirectory(Paths.get(System.getProperty("java.io.tmpdir")), null);
+    }
+
+    /**
+     * Split the table at the provided split point.
+     */
+    public static void splitTable(Connection conn, String tableName, byte[] splitPoint)
+            throws Exception {
+        executeHBaseTableRegionOperation(conn, tableName, (admin, regionLocator, nRegions) -> {
+            admin.split(TableName.valueOf(tableName), splitPoint);
+            waitForRegionChange(regionLocator, nRegions);
+        });
+    }
+
+    /**
+     * Merge the given regions of a table.
+     */
+    public static void mergeTableRegions(Connection conn, String tableName, List<String> regions)
+            throws Exception {
+        byte[][] regionsToMerge = regions.stream()
+                .map(String::getBytes)
+                .toArray(byte[][]::new);
+
+        executeHBaseTableRegionOperation(conn, tableName, (admin, regionLocator, nRegions) -> {
+            admin.mergeRegionsAsync(regionsToMerge, true).get();
+            waitForRegionChange(regionLocator, nRegions);
+        });
+    }
+
+    @FunctionalInterface
+    private interface TableOperation {
+        void execute(Admin admin, RegionLocator regionLocator, int initialRegionCount)
+                throws Exception;
+    }
+
+    private static void executeHBaseTableRegionOperation(Connection conn, String tableName,
+                                                     TableOperation operation) throws Exception {
+        ConnectionQueryServices services = conn.unwrap(PhoenixConnection.class).getQueryServices();
+        Configuration configuration = services.getConfiguration();
+        org.apache.hadoop.hbase.client.Connection hbaseConn
+                = ConnectionFactory.createConnection(configuration);
+        Admin admin = services.getAdmin();
+        RegionLocator regionLocator = hbaseConn.getRegionLocator(TableName.valueOf(tableName));
+        int nRegions = regionLocator.getAllRegionLocations().size();
+        operation.execute(admin, regionLocator, nRegions);
+
+    }
+
+    private static void waitForRegionChange(RegionLocator regionLocator, int initialRegionCount)
+            throws Exception {
+        int retryCount = 0;
+        while (retryCount < 20
+                && regionLocator.getAllRegionLocations().size() == initialRegionCount) {
+            Thread.sleep(5000);
+            retryCount++;
+        }
+        Assert.assertNotEquals(regionLocator.getAllRegionLocations().size(), initialRegionCount);
+    }
+
+    public static List<HRegionLocation> getAllTableRegions(Connection conn, String tableName)
+            throws Exception {
+        ConnectionQueryServices services = conn.unwrap(PhoenixConnection.class).getQueryServices();
+        Configuration configuration = services.getConfiguration();
+        RegionLocator regionLocator;
+        org.apache.hadoop.hbase.client.Connection hbaseConn
+                = ConnectionFactory.createConnection(configuration);
+        regionLocator = hbaseConn.getRegionLocator(TableName.valueOf(tableName));
+        return regionLocator.getAllRegionLocations();
+    }
+
+    public static String retainSingleQuotes(String input) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < input.length(); ++i) {
+            char ch = input.charAt(i);
+            sb.append(ch);
+            if (ch == '\'') {
+                sb.append('\'');
+            }
+        }
+        return sb.toString();
     }
 
 }

@@ -224,7 +224,9 @@ public class PhoenixResultSet implements PhoenixMonitoredResultSet, SQLCloseable
             return;
         }
         try {
-            scanner.close();
+            if (scanner != null) {
+                scanner.close();
+            }
         } finally {
             isClosed = true;
             statement.removeResultSet(this);
@@ -609,6 +611,9 @@ public class PhoenixResultSet implements PhoenixMonitoredResultSet, SQLCloseable
         ColumnProjector projector = getRowProjector().getColumnProjector(columnIndex - 1);
         Object value = projector.getValue(currentRow, projector.getExpression().getDataType(), ptr);
         wasNull = (value == null);
+        if (wasNull) {
+            return null;
+        }
         if (isApplyTimeZoneDisplacement) {
             PDataType type = projector.getExpression().getDataType();
             if (type == PDate.INSTANCE || type == PUnsignedDate.INSTANCE) {
@@ -877,6 +882,10 @@ public class PhoenixResultSet implements PhoenixMonitoredResultSet, SQLCloseable
         return currentRow;
     }
 
+    protected Tuple getCurrentRowImpl() throws SQLException {
+        return scanner.next();
+    }
+
     @Override
     public boolean next() throws SQLException {
         checkOpen();
@@ -885,7 +894,7 @@ public class PhoenixResultSet implements PhoenixMonitoredResultSet, SQLCloseable
                 firstRecordRead = true;
                 overAllQueryMetrics.startResultSetWatch();
             }
-            currentRow = scanner.next();
+            currentRow = getCurrentRowImpl();
             if (currentRow != null) {
                 count++;
                 // Reset this projector with each row
@@ -1517,7 +1526,7 @@ public class PhoenixResultSet implements PhoenixMonitoredResultSet, SQLCloseable
      * @return the row projector including dynamic column projectors in case we are including
      * dynamic columns, otherwise the regular row projector containing static column projectors
      */
-    private RowProjector getRowProjector() {
+    public RowProjector getRowProjector() {
         if (this.rowProjectorWithDynamicCols != null) {
             return this.rowProjectorWithDynamicCols;
         }

@@ -58,7 +58,6 @@ import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.NUM_ARGS_BYTES;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.ORDINAL_POSITION_BYTES;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.PARENT_TENANT_ID_BYTES;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.SYSTEM_CATALOG_NAME_BYTES;
-import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.TTL_NOT_DEFINED;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.PHYSICAL_TABLE_NAME_BYTES;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.PK_NAME_BYTES;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.RETURN_TYPE_BYTES;
@@ -96,6 +95,8 @@ import static org.apache.phoenix.schema.PTableImpl.getColumnsToClone;
 import static org.apache.phoenix.schema.PTableType.CDC;
 import static org.apache.phoenix.schema.PTableType.INDEX;
 import static org.apache.phoenix.schema.PTableType.VIEW;
+import static org.apache.phoenix.schema.LiteralTTLExpression.TTL_EXPRESSION_FOREVER;
+import static org.apache.phoenix.schema.LiteralTTLExpression.TTL_EXPRESSION_NOT_DEFINED;
 import static org.apache.phoenix.util.PhoenixRuntime.TENANT_ID_ATTRIB;
 import static org.apache.phoenix.util.SchemaUtil.*;
 import static org.apache.phoenix.util.ViewUtil.findAllDescendantViews;
@@ -242,6 +243,8 @@ import org.apache.phoenix.schema.SequenceAlreadyExistsException;
 import org.apache.phoenix.schema.SequenceKey;
 import org.apache.phoenix.schema.SequenceNotFoundException;
 import org.apache.phoenix.schema.SortOrder;
+import org.apache.phoenix.schema.TTLExpression;
+import org.apache.phoenix.schema.TTLExpressionFactory;
 import org.apache.phoenix.schema.TableNotFoundException;
 import org.apache.phoenix.schema.export.SchemaRegistryRepository;
 import org.apache.phoenix.schema.export.SchemaRegistryRepositoryFactory;
@@ -756,7 +759,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
             // the PTable of views and indexes on views might get updated because a column is added to one of
             // their parents (this won't change the timestamp)
             if (table.getType() != PTableType.TABLE || table.getTimeStamp() != tableTimeStamp) {
-                builder.setTable(PTableImpl.toProto(table));
+                builder.setTable(PTableImpl.toProto(table, request.getClientVersion()));
             }
             done.run(builder.build());
         } catch (Throwable t) {
@@ -972,11 +975,10 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
         PDataType dataType =
                 PDataType.fromTypeId(PInteger.INSTANCE.getCodec().decodeInt(
                         dataTypeKv.getValueArray(), dataTypeKv.getValueOffset(), SortOrder.getDefault()));
+
         if (maxLength == null && dataType == PBinary.INSTANCE) {
-            dataType = PVarbinary.INSTANCE;   // For
+            dataType = PVarbinary.INSTANCE;   // For Backward compatibility
         }
-        // backward
-        // compatibility.
         Cell sortOrderKv = colKeyValues[SORT_ORDER_INDEX];
         SortOrder sortOrder =
                 sortOrderKv == null ? SortOrder.getDefault() : SortOrder.fromSystemValue(PInteger.INSTANCE
@@ -1419,7 +1421,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
            null : PLong.INSTANCE.getCodec().decodeLong(lastDDLTimestampKv.getValueArray(),
                 lastDDLTimestampKv.getValueOffset(), SortOrder.getDefault());
         builder.setLastDDLTimestamp(lastDDLTimestampKv != null ? lastDDLTimestamp :
-            oldTable != null ? oldTable.getLastDDLTimestamp() : null);
+            oldTable != null ? oldTable.getLastDDLTimestamp() : timeStamp);
 
         Cell changeDetectionEnabledKv = tableKeyValues[CHANGE_DETECTION_ENABLED_INDEX];
         boolean isChangeDetectionEnabled = changeDetectionEnabledKv != null
@@ -1479,17 +1481,17 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
             maxLookbackAge = scanMaxLookbackAgeFromParent(viewKey, clientTimeStamp);
         }
         Cell ttlKv = tableKeyValues[TTL_INDEX];
-        int ttl = TTL_NOT_DEFINED;
+        TTLExpression ttl = TTL_EXPRESSION_NOT_DEFINED;
         if (ttlKv != null) {
             String ttlStr = (String) PVarchar.INSTANCE.toObject(
                     ttlKv.getValueArray(),
                     ttlKv.getValueOffset(),
                     ttlKv.getValueLength());
-            ttl = Integer.parseInt(ttlStr);
+            ttl = TTLExpressionFactory.create(ttlStr);
         }
         ttl = ttlKv != null ? ttl : oldTable != null
-                ? oldTable.getTTL() : TTL_NOT_DEFINED;
-        if (tableType == VIEW && viewType != MAPPED && ttl == TTL_NOT_DEFINED) {
+                ? oldTable.getTTLExpression() : TTL_EXPRESSION_NOT_DEFINED;
+        if (tableType == VIEW && viewType != MAPPED && ttl.equals(TTL_EXPRESSION_NOT_DEFINED)) {
             //Scan SysCat to get TTL from Parent View/Table
             byte[] viewKey = SchemaUtil.getTableKey(tenantId == null ? null : tenantId.getBytes(),
                     schemaName == null ? null : schemaName.getBytes(), tableNameBytes);
@@ -1665,7 +1667,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
                     || (oldTable != null &&
                     oldTable.getBucketNum() != null && oldTable.getBucketNum() > 0);
                 addColumnToTable(columnCellList, colName, famName, colKeyValues, columns,
-                    isSalted, baseColumnCount, isRegularView, columnTimestamp);
+                        isSalted, baseColumnCount, isRegularView, columnTimestamp);
             }
         }
         if (tableType == INDEX && ! isThisAViewIndex) {
@@ -1676,12 +1678,17 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
         builder.setMaxLookbackAge(maxLookbackAge != null ? maxLookbackAge :
                 (oldTable != null ? oldTable.getMaxLookbackAge() : null));
 
-        if(tableType == INDEX && !isThisAViewIndex && ttl == TTL_NOT_DEFINED) {
+        if (tableType == INDEX && !isThisAViewIndex && ttl.equals(TTL_EXPRESSION_NOT_DEFINED)) {
             //If this is an index on Table get TTL from Table
             byte[] tableKey = getTableKey(tenantId == null ? null : tenantId.getBytes(),
                     parentSchemaName == null ? null : parentSchemaName.getBytes(),
                     parentTableName.getBytes());
             ttl = getTTLForTable(tableKey, clientTimeStamp);
+        }
+        if (tableType == INDEX
+                && CDCUtil.isCDCIndex(tableName.getString())
+                && !ttl.equals(TTL_EXPRESSION_NOT_DEFINED)) {
+            ttl = TTL_EXPRESSION_FOREVER;
         }
         builder.setTTL(ttl);
         builder.setEncodedCQCounter(cqCounter);
@@ -1782,7 +1789,10 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
      * @throws SQLException
      */
 
-    private int getTTLFromHierarchy(byte[] viewKey, long clientTimeStamp, boolean checkForMappedView) throws IOException, SQLException {
+    private TTLExpression getTTLFromHierarchy(
+            byte[] viewKey,
+            long clientTimeStamp,
+            boolean checkForMappedView) throws IOException, SQLException {
         Scan scan = MetaDataUtil.newTableRowsScan(viewKey, MIN_TABLE_TIMESTAMP, clientTimeStamp);
         Table sysCat = ServerUtil.getHTableForCoprocessorScan(this.env,
                 SchemaUtil.getPhysicalTableName(SYSTEM_CATALOG_NAME_BYTES,
@@ -1794,12 +1804,12 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
         do {
 
             if (result == null) {
-                return TTL_NOT_DEFINED;
+                return TTL_EXPRESSION_NOT_DEFINED;
             }
 
             //return TTL_NOT_DEFINED for Index on a Mapped View.
             if (checkForMappedView && checkIfViewIsMappedView(result)) {
-                return TTL_NOT_DEFINED;
+                return TTL_EXPRESSION_NOT_DEFINED;
             }
 
             byte[] linkTypeBytes = result.getValue(TABLE_FAMILY_BYTES, LINK_TYPE_BYTES);
@@ -1809,7 +1819,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
             if (result.getValue(TABLE_FAMILY_BYTES, TTL_BYTES) != null) {
                 String ttlStr = (String) PVarchar.INSTANCE.toObject(
                         result.getValue(DEFAULT_COLUMN_FAMILY_BYTES, TTL_BYTES));
-                return Integer.parseInt(ttlStr);
+                return TTLExpressionFactory.create(ttlStr);
             } else if (linkTypeBytes != null ) {
                 String parentSchema =SchemaUtil.getSchemaNameFromFullName(
                         rowKeyMetaData[PhoenixDatabaseMetaData.FAMILY_NAME_INDEX]);
@@ -1858,7 +1868,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
      * @return TTL defined for a given table if it is null then return TTL_NOT_DEFINED(0)
      * @throws IOException
      */
-    private int getTTLForTable(byte[] tableKey, long clientTimeStamp) throws IOException {
+    private TTLExpression getTTLForTable(byte[] tableKey, long clientTimeStamp) throws IOException {
         Scan scan = MetaDataUtil.newTableRowsScan(tableKey, MIN_TABLE_TIMESTAMP, clientTimeStamp);
         Table sysCat = ServerUtil.getHTableForCoprocessorScan(this.env,
                 SchemaUtil.getPhysicalTableName(SYSTEM_CATALOG_NAME_BYTES,
@@ -1867,16 +1877,16 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
         Result result = scanner.next();
         do {
             if (result == null) {
-                return TTL_NOT_DEFINED;
+                return TTL_EXPRESSION_NOT_DEFINED;
             }
             if (result.getValue(TABLE_FAMILY_BYTES, TTL_BYTES) != null) {
                 String ttlStr = (String) PVarchar.INSTANCE.toObject(
                         result.getValue(DEFAULT_COLUMN_FAMILY_BYTES, TTL_BYTES));
-                return Integer.parseInt(ttlStr);
+                return TTLExpressionFactory.create(ttlStr);
             }
             result = scanner.next();
         } while (result != null);
-        return TTL_NOT_DEFINED;
+        return TTL_EXPRESSION_NOT_DEFINED;
     }
 
     private Long getViewIndexId(Cell[] tableKeyValues, PDataType viewIndexIdType) {
@@ -2394,14 +2404,14 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
                     if (!isTableDeleted(table)) {
                         builder.setReturnCode(MetaDataProtos.MutationCode.TABLE_ALREADY_EXISTS);
                         builder.setMutationTime(EnvironmentEdgeManager.currentTimeMillis());
-                        builder.setTable(PTableImpl.toProto(table));
+                        builder.setTable(PTableImpl.toProto(table, clientVersion));
                         done.run(builder.build());
                         return;
                     }
                 } else {
                     builder.setReturnCode(MetaDataProtos.MutationCode.NEWER_TABLE_FOUND);
                     builder.setMutationTime(EnvironmentEdgeManager.currentTimeMillis());
-                    builder.setTable(PTableImpl.toProto(table));
+                    builder.setTable(PTableImpl.toProto(table, clientVersion));
                     done.run(builder.build());
                     return;
                 }
@@ -2822,7 +2832,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
                 PTable newTable = buildTable(tableKey, cacheKey, region,
                     clientTimeStamp, clientVersion);
                 if (newTable != null) {
-                    builder.setTable(PTableImpl.toProto(newTable));
+                    builder.setTable(PTableImpl.toProto(newTable, clientVersion));
                 }
 
                 done.run(builder.build());
@@ -3016,7 +3026,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
                     Pair<List<PTable>, List<TableInfo>> descendantViews =
                             findAllDescendantViews(hTable, env.getConfiguration(),
                                     tenantIdBytes, schemaName, tableOrViewName, clientTimeStamp,
-                                    true);
+                                    true, true);
                     List<PTable> legitimateChildViews = descendantViews.getFirst();
                     List<TableInfo> orphanChildViews = descendantViews.getSecond();
                     if (!legitimateChildViews.isEmpty()) {
@@ -3406,16 +3416,16 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
      * @param childViews child views of table or parent view. Usually this is an empty list
      *     passed to this method, and this method will add child views retrieved using
      *     {@link ViewUtil#findAllDescendantViews(Table, Configuration, byte[], byte[], byte[],
-     *     long, boolean)}
+     *     long, boolean, boolean)}
      * @param clientVersion client version, used to determine if mutation is allowed.
      * @return Optional.empty() if mutation is allowed on parent table/view. If not allowed,
      *     returned Optional object will contain metaDataMutationResult with MutationCode.
      * @throws IOException if something goes wrong while retrieving child views using
      *     {@link ViewUtil#findAllDescendantViews(Table, Configuration, byte[], byte[], byte[],
-     *     long, boolean)}
+     *     long, boolean, boolean)}
      * @throws SQLException if something goes wrong while retrieving child views using
      *     {@link ViewUtil#findAllDescendantViews(Table, Configuration, byte[], byte[], byte[],
-     *     long, boolean)}
+     *     long, boolean, boolean)}
      */
     private Optional<MetaDataMutationResult> validateIfMutationAllowedOnParent(
             final PTable parentTable,
@@ -3438,7 +3448,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
                 childViews.addAll(findAllDescendantViews(hTable, sysCat, env.getConfiguration(),
                         tenantId, schemaName, tableOrViewName, clientTimeStamp, new ArrayList<>(),
                         new ArrayList<>(), false,
-                        scanSysCatForTTLDefinedOnAnyChildPair)
+                        scanSysCatForTTLDefinedOnAnyChildPair, true)
                         .getFirst());
             }
 
@@ -3856,8 +3866,8 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
                     Cell cell = cells.get(0);
                     String newTTLStr = (String) PVarchar.INSTANCE.toObject(cell.getValueArray(),
                             cell.getValueOffset(), cell.getValueLength());
-                    int newTTL = Integer.parseInt(newTTLStr);
-                    return newTTL != TTL_NOT_DEFINED;
+                    TTLExpression newTTL = TTLExpressionFactory.create(newTTLStr);
+                    return !newTTL.equals(TTL_EXPRESSION_NOT_DEFINED);
                 }
             }
         }
@@ -4593,7 +4603,7 @@ TABLE_FAMILY_BYTES, TABLE_SEQ_NUM_BYTES);
                 builder.setReturnCode(MetaDataProtos.MutationCode.TABLE_ALREADY_EXISTS);
                 builder.setMutationTime(currentTime);
                 if (returnTable != null) {
-                    builder.setTable(PTableImpl.toProto(returnTable));
+                    builder.setTable(PTableImpl.toProto(returnTable, request.getClientVersion()));
                 }
                 done.run(builder.build());
                 return;

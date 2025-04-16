@@ -21,6 +21,8 @@ import static org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder.KEEP_
 import static org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder.MAX_VERSIONS;
 import static org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder.REPLICATION_SCOPE;
 import static org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder.TTL;
+import static org.apache.hadoop.hbase.client.MetricsConnection.CLIENT_SIDE_METRICS_ENABLED_KEY;
+import static org.apache.hadoop.hbase.client.MetricsConnection.METRICS_SCOPE_KEY;
 import static org.apache.hadoop.hbase.ipc.RpcControllerFactory.CUSTOM_CONTROLLER_CONF_KEY;
 import static org.apache.phoenix.coprocessorclient.MetaDataProtocol.MIN_SYSTEM_TABLE_TIMESTAMP;
 import static org.apache.phoenix.coprocessorclient.MetaDataProtocol.MIN_SYSTEM_TABLE_TIMESTAMP_4_15_0;
@@ -164,6 +166,7 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.RpcConnectionRegistry;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
@@ -269,6 +272,8 @@ import org.apache.phoenix.schema.Sequence;
 import org.apache.phoenix.schema.SequenceAllocation;
 import org.apache.phoenix.schema.SequenceKey;
 import org.apache.phoenix.schema.SortOrder;
+import org.apache.phoenix.schema.TTLExpression;
+import org.apache.phoenix.schema.LiteralTTLExpression;
 import org.apache.phoenix.schema.TableAlreadyExistsException;
 import org.apache.phoenix.schema.TableNotFoundException;
 import org.apache.phoenix.schema.TableProperty;
@@ -474,6 +479,22 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
         // Without making a copy of the configuration we cons up, we lose some of our properties
         // on the server side during testing.
         this.config = HBaseFactoryProvider.getConfigurationFactory().getConfiguration(config);
+
+        LOGGER.info(
+                "CQS Configs {} = {} , {} = {} , {} = {} , {} = {} , {} = {} , {} = {} , {} = {}",
+                HConstants.ZOOKEEPER_QUORUM,
+                this.config.get(HConstants.ZOOKEEPER_QUORUM), HConstants.CLIENT_ZOOKEEPER_QUORUM,
+                this.config.get(HConstants.CLIENT_ZOOKEEPER_QUORUM),
+                HConstants.CLIENT_ZOOKEEPER_CLIENT_PORT,
+                this.config.get(HConstants.CLIENT_ZOOKEEPER_CLIENT_PORT),
+                HConstants.ZOOKEEPER_CLIENT_PORT,
+                this.config.get(HConstants.ZOOKEEPER_CLIENT_PORT),
+                RpcConnectionRegistry.BOOTSTRAP_NODES,
+                this.config.get(RpcConnectionRegistry.BOOTSTRAP_NODES),
+                HConstants.MASTER_ADDRS_KEY, this.config.get(HConstants.MASTER_ADDRS_KEY),
+                ConnectionInfo.CLIENT_CONNECTION_REGISTRY_IMPL_CONF_KEY,
+                this.config.get(ConnectionInfo.CLIENT_CONNECTION_REGISTRY_IMPL_CONF_KEY));
+
         //Set the rpcControllerFactory if it is a server side connnection.
         boolean isServerSideConnection = config.getBoolean(QueryUtil.IS_SERVER_CONNECTION, false);
         if (isServerSideConnection) {
@@ -536,6 +557,9 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
                     .build();
         }
 
+        if (this.config.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            this.config.set(METRICS_SCOPE_KEY, config.get(QUERY_SERVICES_NAME));
+        }
 
         if (!QueryUtil.isServerConnection(props)) {
             //Start queryDistruptor everytime as log level can be change at connection level as well, but we can avoid starting for server connections.
@@ -2998,7 +3022,7 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
         boolean willBeTransactional = false;
         boolean isOrWillBeTransactional = isTransactional;
         Integer newTTL = null;
-        Integer newPhoenixTTL = null;
+        TTLExpression newPhoenixTTL = null;
         Integer newReplicationScope = null;
         KeepDeletedCells newKeepDeletedCells = null;
         TransactionFactory.Provider txProvider = null;
@@ -3044,14 +3068,17 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
                                 //If Phoenix level TTL is enabled we are using TTL as phoenix
                                 //Table level property.
                                 if (!isPhoenixTTLEnabled()) {
-                                    newTTL = ((Number) propValue).intValue();
+                                    // only literal TTL expression
+                                    LiteralTTLExpression ttlExpr =
+                                            (LiteralTTLExpression) TableProperty.TTL.getValue(propValue);
+                                    newTTL = ttlExpr != null ? ttlExpr.getTTLValue() : null;
                                     //Even though TTL is really a HColumnProperty we treat it
                                     //specially. We enforce that all CFs have the same TTL.
                                     commonFamilyProps.put(propName, propValue);
                                 } else {
                                     //Setting this here just to check if we need to throw Exception
                                     //for Transaction's SET_TTL Feature.
-                                    newPhoenixTTL = ((Number) propValue).intValue();
+                                    newPhoenixTTL = (TTLExpression) TableProperty.TTL.getValue(propValue);
                                 }
                             } else if (propName.equals(PhoenixDatabaseMetaData.TRANSACTIONAL) && Boolean.TRUE.equals(propValue)) {
                                 willBeTransactional = isOrWillBeTransactional = true;
@@ -4443,6 +4470,7 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
 
             //move TTL values stored in descriptor to SYSCAT TTL column.
             moveTTLFromHBaseLevelTTLToPhoenixLevelTTL(metaConnection);
+            UpgradeUtil.bootstrapLastDDLTimestampForTablesAndViews(metaConnection);
             UpgradeUtil.bootstrapLastDDLTimestampForIndexes(metaConnection);
         }
         return metaConnection;

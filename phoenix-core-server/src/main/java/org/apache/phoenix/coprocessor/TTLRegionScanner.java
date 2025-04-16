@@ -19,7 +19,6 @@ package org.apache.phoenix.coprocessor;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -27,23 +26,25 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.regionserver.ScannerContext;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.phoenix.query.QueryServices;
-import org.apache.phoenix.query.QueryServicesOptions;
+import org.apache.phoenix.schema.CompiledTTLExpression;
+import org.apache.phoenix.schema.TTLExpressionFactory;
 import org.apache.phoenix.util.EnvironmentEdgeManager;
 import org.apache.phoenix.util.ScanUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.phoenix.coprocessor.BaseScannerRegionObserver.isPhoenixTableTTLEnabled;
 import static org.apache.phoenix.coprocessorclient.BaseScannerRegionObserverConstants.EMPTY_COLUMN_FAMILY_NAME;
 import static org.apache.phoenix.coprocessorclient.BaseScannerRegionObserverConstants.EMPTY_COLUMN_QUALIFIER_NAME;
 import static org.apache.phoenix.coprocessorclient.BaseScannerRegionObserverConstants.IS_PHOENIX_TTL_SCAN_TABLE_SYSTEM;
-import static org.apache.phoenix.coprocessor.BaseScannerRegionObserver.isPhoenixTableTTLEnabled;
+import static org.apache.phoenix.schema.LiteralTTLExpression.TTL_EXPRESSION_FOREVER;
 
 /**
  *  TTLRegionScanner masks expired rows using the empty column cell timestamp
@@ -62,33 +63,35 @@ public class TTLRegionScanner extends BaseRegionScanner {
     byte[] emptyCQ;
     byte[] emptyCF;
     private boolean initialized = false;
+    private CompiledTTLExpression ttlExpression;
+    long currentTime;
 
     public TTLRegionScanner(final RegionCoprocessorEnvironment env, final Scan scan,
-            final RegionScanner s) {
+            final RegionScanner s) throws IOException {
         super(s);
         this.env = env;
         this.scan = scan;
         this.pageSizeMs = ScanUtil.getPageSizeMsForRegionScanner(scan);
         emptyCQ = scan.getAttribute(EMPTY_COLUMN_QUALIFIER_NAME);
         emptyCF = scan.getAttribute(EMPTY_COLUMN_FAMILY_NAME);
-        long currentTime = scan.getTimeRange().getMax() == HConstants.LATEST_TIMESTAMP ?
-                EnvironmentEdgeManager.currentTimeMillis() : scan.getTimeRange().getMax();
+        currentTime = scan.getTimeRange().getMax() == HConstants.LATEST_TIMESTAMP
+                ? EnvironmentEdgeManager.currentTimeMillis() : scan.getTimeRange().getMax();
         byte[] isSystemTable = scan.getAttribute(IS_PHOENIX_TTL_SCAN_TABLE_SYSTEM);
         if (isPhoenixTableTTLEnabled(env.getConfiguration()) && (isSystemTable == null
                 || !Bytes.toBoolean(isSystemTable))) {
-            ttl = ScanUtil.getTTL(this.scan);
+            ttlExpression = ScanUtil.getTTLExpression(this.scan);
         } else {
-            ttl = env.getRegion().getTableDescriptor().getColumnFamilies()[0].getTimeToLive();
+            ColumnFamilyDescriptor cfd =
+                    env.getRegion().getTableDescriptor().getColumnFamilies()[0];
+            ttlExpression = TTLExpressionFactory.create(cfd.getTimeToLive());
         }
         // Regardless if the Phoenix Table TTL feature is disabled cluster wide or the client is
         // an older client and does not supply the empty column parameters, the masking should not
         // be done here. We also disable masking when TTL is HConstants.FOREVER.
-        isMaskingEnabled = emptyCF != null && emptyCQ != null && ttl != HConstants.FOREVER
+        isMaskingEnabled = emptyCF != null && emptyCQ != null
+                && !ttlExpression.equals(TTL_EXPRESSION_FOREVER)
                 && (isPhoenixTableTTLEnabled(env.getConfiguration()) && (isSystemTable == null
                 || !Bytes.toBoolean(isSystemTable)));
-
-        ttlWindowStart = ttl == HConstants.FOREVER ? 1 : currentTime - ttl * 1000;
-        ttl *= 1000;
     }
 
     private void init() throws IOException {
@@ -102,11 +105,18 @@ public class TTLRegionScanner extends BaseRegionScanner {
         }
     }
 
+    private void setTTLContextForRow(List<Cell> result) {
+        ttl = ttlExpression.getRowTTLForMasking(result, this.scan.isRaw());
+        ttlWindowStart = ttl == HConstants.FOREVER ? 1 : currentTime - ttl * 1000;
+        ttl *= 1000;
+    }
+
     private boolean isExpired(List<Cell> result) throws IOException {
         long maxTimestamp = 0;
         long minTimestamp = Long.MAX_VALUE;
         long ts;
         boolean found = false;
+        setTTLContextForRow(result);
         for (Cell c : result) {
             ts = c.getTimestamp();
             if (!found && ScanUtil.isEmptyColumn(c, emptyCF, emptyCQ)) {
@@ -128,38 +138,66 @@ public class TTLRegionScanner extends BaseRegionScanner {
         if (maxTimestamp - minTimestamp <= ttl) {
             return false;
         }
-        // We need check if the gap between two consecutive cell timestamps is more than ttl
-        // and if so trim the cells beyond the gap
-        Scan singleRowScan = new Scan();
-        singleRowScan.setRaw(true);
-        singleRowScan.readAllVersions();
-        singleRowScan.setTimeRange(scan.getTimeRange().getMin(), scan.getTimeRange().getMax());
-        byte[] rowKey = CellUtil.cloneRow(result.get(0));
-        singleRowScan.withStartRow(rowKey, true);
-        singleRowScan.withStopRow(rowKey, true);
-        RegionScanner scanner = ((DelegateRegionScanner)delegate).getNewRegionScanner(singleRowScan);
+
+        // We need to check if the gap between two consecutive cell timestamps is more than ttl
+        // and if so trim the cells beyond the gap. The gap analysis works by doing a scan in a
+        // sliding time range window of ttl width. This scan reads the latest version of the row in
+        // that time range. If we find a version, then in that time range there is no gap. We find
+        // the timestamp at which the update happened and then slide the window past that
+        // timestamp. If no version is returned, then we have found a gap.
+        // On a gap, all the cells below the current sliding window's end time
+        // can be trimmed from the result. We slide the window past the current end time to find
+        // any more gaps so that we can find the largest timestamp in the
+        // [minTimestamp, maxTimestamp] window below which all the cells can be trimmed.
+        // This algorithm doesn't read all the row versions into the memory since the
+        // number of row versions can be unbounded and reading all of them at once can cause GC
+        // issues. In practice, ttl windows are in days or months so the entire
+        // [minTimestamp, maxTimestamp] range shouldn't span more than 2-3 ttl windows.
+        // We know that an update happened at minTimestamp so initialize the sliding window
+        // to [minTimestamp + 1, minTimestamp + ttl] which means the scan range should be
+        // [minTimestamp + 1, minTimestamp + ttl + 1).
+        long wndStartTS = minTimestamp + 1;
+        long wndEndTS = wndStartTS + ttl;
+        // any cell in the scan result list having a timestamp below trimTimestamp will be
+        // removed from the list and not returned back to the client. Initially, it is equal to
+        // the minTimestamp.
+        long trimTimestamp = minTimestamp;
         List<Cell> row = new ArrayList<>();
-        scanner.next(row);
-        scanner.close();
-        if (row.isEmpty()) {
-            return true;
-        }
-        int size = row.size();
-        long tsArray[] = new long[size];
-        int i = 0;
-        for (Cell cell : row) {
-            tsArray[i++] = cell.getTimestamp();
-        }
-        Arrays.sort(tsArray);
-        for (i = size - 1; i > 0; i--) {
-            if (tsArray[i] - tsArray[i - 1] > ttl) {
-                minTimestamp = tsArray[i];
-                break;
+        LOG.debug("Doing gap analysis for {} min = {}, max = {}",
+                env.getRegionInfo().getRegionNameAsString(), minTimestamp, maxTimestamp);
+        while (wndEndTS <= maxTimestamp) {
+            LOG.debug("WndStart = {}, WndEnd = {}, trim = {}", wndStartTS, wndEndTS, trimTimestamp);
+            row.clear(); // reset the row on every iteration
+            Scan singleRowScan = new Scan();
+            singleRowScan.setTimeRange(wndStartTS, wndEndTS);
+            byte[] rowKey = CellUtil.cloneRow(result.get(0));
+            singleRowScan.withStartRow(rowKey, true);
+            singleRowScan.withStopRow(rowKey, true);
+            RegionScanner scanner =
+                    ((DelegateRegionScanner) delegate).getNewRegionScanner(singleRowScan);
+            scanner.next(row);
+            scanner.close();
+            if (row.isEmpty()) {
+                // no update in this window, we found a gap and the row expired
+                trimTimestamp = wndEndTS - 1;
+                LOG.debug("Found gap at {}", trimTimestamp);
+                // next window will start at wndEndTS. Scan timeranges are half-open [min, max)
+                wndStartTS = wndEndTS;
+            } else {
+                // we found an update within the ttl
+                long lastUpdateTS = 0;
+                for (Cell cell : row) {
+                    lastUpdateTS = Math.max(lastUpdateTS, cell.getTimestamp());
+                }
+                // slide the window 1 past the lastUpdateTS
+                LOG.debug("lastUpdateTS = {}", lastUpdateTS);
+                wndStartTS = lastUpdateTS + 1;
             }
+            wndEndTS = wndStartTS + ttl;
         }
         Iterator<Cell> iterator = result.iterator();
         while(iterator.hasNext()) {
-            if (iterator.next().getTimestamp() < minTimestamp) {
+            if (iterator.next().getTimestamp() < trimTimestamp) {
                 iterator.remove();
             }
         }

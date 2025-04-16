@@ -18,13 +18,45 @@
 
 package org.apache.phoenix.end2end;
 
+import static java.util.Arrays.asList;
+import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.COLUMN_TYPES;
+import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.MAX_ROWS;
+import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_COLUMNS;
+import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_INCLUDE_COLUMNS;
+import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_INDEX_COLUMNS;
+import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_PK_COLUMNS;
+import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_PK_TYPES;
+import static org.apache.phoenix.schema.LiteralTTLExpression.TTL_EXPRESSION_NOT_DEFINED;
+import static org.apache.phoenix.util.PhoenixRuntime.TENANT_ID_ATTRIB;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.Set;
+
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
-import org.apache.hadoop.hbase.client.CompactionState;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.RegionInfo;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
@@ -38,8 +70,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.phoenix.jdbc.PhoenixConnection;
 import org.apache.phoenix.jdbc.PhoenixDatabaseMetaData;
 import org.apache.phoenix.query.PhoenixTestBuilder;
-import org.apache.phoenix.query.QueryConstants;
-import org.apache.phoenix.query.QueryServices;
 import org.apache.phoenix.query.PhoenixTestBuilder.BasicDataReader;
 import org.apache.phoenix.query.PhoenixTestBuilder.BasicDataWriter;
 import org.apache.phoenix.query.PhoenixTestBuilder.DataReader;
@@ -54,55 +84,42 @@ import org.apache.phoenix.query.PhoenixTestBuilder.SchemaBuilder.OtherOptions;
 import org.apache.phoenix.query.PhoenixTestBuilder.SchemaBuilder.TableOptions;
 import org.apache.phoenix.query.PhoenixTestBuilder.SchemaBuilder.TenantViewIndexOptions;
 import org.apache.phoenix.query.PhoenixTestBuilder.SchemaBuilder.TenantViewOptions;
-
+import org.apache.phoenix.query.QueryConstants;
+import org.apache.phoenix.query.QueryServices;
 import org.apache.phoenix.schema.PName;
 import org.apache.phoenix.schema.PTable;
-
 import org.apache.phoenix.schema.PTableKey;
+import org.apache.phoenix.schema.SortOrder;
+import org.apache.phoenix.schema.TTLExpression;
+import org.apache.phoenix.schema.types.PChar;
+import org.apache.phoenix.schema.TTLExpressionFactory;
 import org.apache.phoenix.schema.types.PDataType;
+import org.apache.phoenix.schema.types.PDate;
+import org.apache.phoenix.schema.types.PDecimal;
+import org.apache.phoenix.schema.types.PInteger;
+import org.apache.phoenix.schema.types.PLong;
+import org.apache.phoenix.schema.types.PTimestamp;
+import org.apache.phoenix.schema.types.PVarbinary;
+import org.apache.phoenix.schema.types.PVarbinaryEncoded;
+import org.apache.phoenix.schema.types.PVarchar;
 import org.apache.phoenix.thirdparty.com.google.common.base.Joiner;
 import org.apache.phoenix.thirdparty.com.google.common.collect.Lists;
 import org.apache.phoenix.thirdparty.com.google.common.collect.Maps;
+import org.apache.phoenix.util.ByteUtil;
 import org.apache.phoenix.util.EnvironmentEdgeManager;
+import org.apache.phoenix.util.LogUtil;
 import org.apache.phoenix.util.ManualEnvironmentEdge;
 import org.apache.phoenix.util.ReadOnlyProps;
 import org.apache.phoenix.util.SchemaUtil;
 import org.apache.phoenix.util.TestUtil;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
-
-import static java.util.Arrays.asList;
-import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.COLUMN_TYPES;
-import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.MAX_ROWS;
-import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_COLUMNS;
-import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_INCLUDE_COLUMNS;
-import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_INDEX_COLUMNS;
-import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_PK_COLUMNS;
-import static org.apache.phoenix.query.PhoenixTestBuilder.DDLDefaults.TENANT_VIEW_PK_TYPES;
-import static org.apache.phoenix.util.PhoenixRuntime.TENANT_ID_ATTRIB;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
+@RunWith(Parameterized.class)
 public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
     static final Logger LOGGER = LoggerFactory.getLogger(ViewTTLIT.class);
     static final int VIEW_TTL_10_SECS = 10;
@@ -112,7 +129,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
     static final String ID_FMT = "00A0y000%07d";
     static final String ZID_FMT = "00B0y000%07d";
     static final String ALTER_TTL_SQL
-            = "ALTER VIEW \"%s\".\"%s\" set TTL=%s";
+            = "ALTER VIEW \"%s\".\"%s\" set TTL='%s'";
 
     static final String ALTER_SQL_WITH_NO_TTL
             = "ALTER VIEW \"%s\".\"%s\" ADD IF NOT EXISTS %s CHAR(10)";
@@ -134,8 +151,21 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
     ManualEnvironmentEdge injectEdge;
 
+    private boolean useCondExpression;
+
+    public BaseViewTTLIT(boolean useCondExpression) {
+        this.useCondExpression = useCondExpression;
+    }
+
     protected static void setUpTestDriver(ReadOnlyProps props) throws Exception {
         setUpTestDriver(props, props);
+    }
+
+    @Parameterized.Parameters(name = "useCondExpression={0}")
+    public static synchronized Collection<Boolean[]> data() {
+        return Arrays.asList(new Boolean[][]{
+                {false}, {true}
+        });
     }
 
     @Before
@@ -162,6 +192,122 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    private SortOrder[][] getSortOrders() {
+        SortOrder[][]
+                sortOrders =
+                new SortOrder[][] {
+                        { SortOrder.ASC, SortOrder.ASC, SortOrder.ASC },
+                        { SortOrder.ASC, SortOrder.ASC, SortOrder.DESC },
+                        { SortOrder.ASC, SortOrder.DESC, SortOrder.ASC },
+                        { SortOrder.ASC, SortOrder.DESC, SortOrder.DESC },
+                        { SortOrder.DESC, SortOrder.ASC, SortOrder.ASC },
+                        { SortOrder.DESC, SortOrder.ASC, SortOrder.DESC },
+                        { SortOrder.DESC, SortOrder.DESC, SortOrder.ASC },
+                        { SortOrder.DESC, SortOrder.DESC, SortOrder.DESC }
+                };
+        return sortOrders;
+    }
+
+
+    private List<PDataType[]> getTestCases() {
+
+        List<PDataType[]> testCases = new ArrayList<>();
+        // Test Case 1: PK1 = Integer, PK2 = Integer, PK3 = Integer
+        testCases.add(new PDataType[] { PInteger.INSTANCE, PInteger.INSTANCE, PInteger.INSTANCE });
+        // Test Case 2: PK1 = Long, PK2 = Long, PK3 = Long
+        testCases.add(new PDataType[] { PLong.INSTANCE, PLong.INSTANCE, PLong.INSTANCE });
+        // Test Case 3: PK1 = Timestamp, PK2 = Timestamp, PK3 = Timestamp
+        testCases.add(
+                new PDataType[] { PTimestamp.INSTANCE, PTimestamp.INSTANCE, PTimestamp.INSTANCE });
+        // Test Case 4: PK1 = Char, PK2 = Char, PK3 = Char
+        testCases.add(new PDataType[] { PChar.INSTANCE, PChar.INSTANCE, PChar.INSTANCE });
+        // Test Case 5: PK1 = Decimal, PK2 = Decimal, PK3 = Integer
+        // last PK cannot be of variable length when creating a view on top of it
+        testCases.add(new PDataType[] { PDecimal.INSTANCE, PDecimal.INSTANCE, PInteger.INSTANCE });
+        // Test Case 6: PK1 = Date, PK2 = Date, PK3 = Date
+        testCases.add(new PDataType[] { PDate.INSTANCE, PDate.INSTANCE, PDate.INSTANCE });
+        // Test Case 7: PK1 = Varchar, PK2 = Varchar, PK3 = Integer
+        // last PK cannot be of variable length when creating a view on top of it
+        testCases.add(new PDataType[] { PVarchar.INSTANCE, PVarchar.INSTANCE, PInteger.INSTANCE });
+
+        // Test Case 8: PK1 = VARBINARY_ENCODED, PK2 = Varchar, PK3 = VARBINARY_ENCODED
+        testCases.add(new PDataType[] { PVarbinaryEncoded.INSTANCE, PVarchar.INSTANCE, PInteger.INSTANCE });
+        return testCases;
+    }
+
+    private String getWhereClause(String[] pkNames, PDataType[] testPKTypes) {
+
+        StringBuilder builder = new StringBuilder("WHERE ");
+        Random rnd = new Random();
+
+        for (int b = 0; b < testPKTypes.length; b++) {
+            if (b > 0) builder.append(" AND ");
+            switch (testPKTypes[b].getSqlType()) {
+                case Types.VARCHAR: {
+                    // pkTypeStr = "VARCHAR(25)";
+                    builder.append(pkNames[b]).append(" = ").append("'")
+                            .append(RandomStringUtils.randomAlphanumeric(25)).append("'");
+                    break;
+                }
+                case Types.CHAR: {
+                    //pkTypeStr = "CHAR(15)";
+                    builder.append(pkNames[b]).append(" = ").append("'")
+                            .append(RandomStringUtils.randomAlphanumeric(15)).append("'");
+                    break;
+                }
+                case Types.DECIMAL:
+                    //pkTypeStr = "DECIMAL(8,2)";
+                    builder.append(pkNames[b]).append(" = ").append(rnd.nextDouble());
+                    break;
+                case Types.INTEGER:
+                    //pkTypeStr = "INTEGER";
+                    builder.append(pkNames[b]).append(" = ").append(rnd.nextInt(500000));
+                    break;
+                case Types.BIGINT:
+                    //pkTypeStr = "BIGINT";
+                    builder.append(pkNames[b]).append(" = ").append(rnd.nextLong());
+                    break;
+                case Types.DATE:
+                    //pkTypeStr = "DATE";
+                    builder.append(pkNames[b]).append(" = ")
+                            .append(" TO_DATE('2022-03-21T15:03:57+00:00') ");
+                    break;
+                case Types.TIMESTAMP:
+                    //pkTypeStr = "TIMESTAMP";
+                    builder.append(pkNames[b]).append(" = ")
+                            .append(" TO_TIMESTAMP('2019-10-27T16:17:57+00:00') ");
+                    break;
+                case Types.VARBINARY:
+                    // pkTypeStr = "VARBINARY";
+                case PDataType.VARBINARY_ENCODED_TYPE:
+                    // pkTypeStr = "VARBINARY_ENCODED";
+                    byte[] varBytes = ByteUtil.concat(
+                            RandomStringUtils.randomAlphanumeric(25).getBytes(),
+                            Bytes.toBytes(rnd.nextInt(50000)),
+                            Bytes.toBytes(Math.floor(rnd.nextInt(50000) * rnd.nextDouble())));
+                    builder.append(pkNames[b]).append(" = ")
+                            .append(PVarbinary.INSTANCE.toStringLiteral(varBytes));
+                    break;
+                default:
+                    // pkTypeStr = "VARCHAR(25)";
+                    builder.append(pkNames[b]).append("=").append("'")
+                            .append(RandomStringUtils.randomAlphanumeric(15)).append("'");
+            }
+        }
+        return builder.toString();
+    }
+
+    /**
+     *
+     * @param ttl in seconds
+     * @return
+     */
+    protected String getTTLExpression(int ttl) {
+        return useCondExpression ? String.format(
+                "TO_NUMBER(CURRENT_TIME()) - TO_NUMBER(PHOENIX_ROW_TIMESTAMP()) >= %d", ttl*1000)
+                : String.valueOf(ttl);
     }
 
     private void clearCache(boolean globalFixNeeded, boolean tenantFixNeeded, List<String> allTenants)
@@ -249,7 +395,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
     }
 
     void assertSyscatHavePhoenixTTLRelatedColumns(String tenantId, String schemaName,
-            String tableName, String tableType, long ttlValueExpected) throws SQLException {
+            String tableName, String tableType, String ttlExpected) throws SQLException {
 
         try (Connection connection = DriverManager.getConnection(getUrl())) {
             Statement stmt = connection.createStatement();
@@ -261,10 +407,11 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
             stmt.execute(sql);
             ResultSet rs = stmt.getResultSet();
             String ttlStr = rs.next() ? rs.getString(1) : null;
-            long actualTTLValueReturned = ttlStr != null ? Integer.valueOf(ttlStr): 0;
-
+            TTLExpression actual = ttlStr != null ?
+                    TTLExpressionFactory.create(ttlStr): TTL_EXPRESSION_NOT_DEFINED;
+            TTLExpression expected = TTLExpressionFactory.create(ttlExpected);
             assertEquals(String.format("Expected rows do not match for schema = %s, table = %s",
-                    schemaName, tableName), ttlValueExpected, actualTTLValueReturned);
+                    schemaName, tableName), expected, actual);
         }
     }
 
@@ -289,7 +436,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         GlobalViewOptions
                 globalViewOptions = GlobalViewOptions.withDefaults();
         // View TTL is set to 300s => 300000 ms
-        globalViewOptions.setTableProps("TTL=300");
+        int viewTTL = 300;
+        globalViewOptions.setTableProps(String.format("TTL='%s'", getTTLExpression(viewTTL)));
 
         GlobalViewIndexOptions globalViewIndexOptions
                 = GlobalViewIndexOptions.withDefaults();
@@ -341,7 +489,9 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         TenantViewOptions
                 tenantViewWithOverrideOptions = TenantViewOptions.withDefaults();
         // View TTL is set to 300s => 300000 ms
-        tenantViewWithOverrideOptions.setTableProps("TTL=300");
+        int viewTTL = 300;
+        tenantViewWithOverrideOptions.setTableProps(String.format("TTL='%s'",
+                getTTLExpression(viewTTL)));
         if (tenantViewOptions != null) {
             tenantViewWithOverrideOptions = tenantViewOptions;
         }
@@ -402,7 +552,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
     void validateExpiredRowsAreNotReturnedUsingCounts(long viewTTL, DataReader dataReader,
             SchemaBuilder schemaBuilder) throws IOException, SQLException {
-
+        EnvironmentEdgeManager.reset();
         String tenantConnectUrl =
                 getUrl() + ';' + TENANT_ID_ATTRIB + '=' + schemaBuilder.getDataOptions().getTenantId();
 
@@ -417,9 +567,11 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         }
 
         // Verify after TTL expiration
-        long scnTimestamp = EnvironmentEdgeManager.currentTimeMillis();
+        long scnTimestamp = EnvironmentEdgeManager.currentTimeMillis() + (2 * viewTTL * 1000);
         Properties props = new Properties();
-        props.setProperty("CurrentSCN", Long.toString(scnTimestamp + (2 * viewTTL * 1000)));
+        props.setProperty("CurrentSCN", Long.toString(scnTimestamp));
+        injectEdge.setValue(scnTimestamp);
+        EnvironmentEdgeManager.injectEdge(injectEdge);
         try (Connection readConnection = DriverManager.getConnection(tenantConnectUrl, props)) {
 
             dataReader.setConnection(readConnection);
@@ -429,12 +581,13 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
             assertEquals("Expired rows should not be fetched", 0,
                     fetchedData.rowKeySet().size());
         }
+        EnvironmentEdgeManager.reset();
     }
 
     void validateExpiredRowsAreNotReturnedUsingData(long viewTTL,
             org.apache.phoenix.thirdparty.com.google.common.collect.Table<String, String, Object> upsertedData,
             DataReader dataReader, SchemaBuilder schemaBuilder) throws SQLException {
-
+        EnvironmentEdgeManager.reset();
         String tenantConnectUrl =
                 getUrl() + ';' + TENANT_ID_ATTRIB + '=' + schemaBuilder.getDataOptions().getTenantId();
 
@@ -443,6 +596,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         long scnTimestamp = EnvironmentEdgeManager.currentTimeMillis() + 1;
         props.setProperty("CurrentSCN", Long.toString(scnTimestamp));
         props.setProperty(QueryServices.COLLECT_REQUEST_LEVEL_METRICS, String.valueOf(true));
+        injectEdge.setValue(scnTimestamp);
+        EnvironmentEdgeManager.injectEdge(injectEdge);
         try (Connection readConnection = DriverManager.getConnection(tenantConnectUrl, props)) {
 
             dataReader.setConnection(readConnection);
@@ -457,6 +612,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
         // Verify after TTL expiration
         props.setProperty("CurrentSCN", Long.toString(scnTimestamp + (2 * viewTTL * 1000)));
+        injectEdge.setValue(scnTimestamp + (2 * viewTTL * 1000));
         try (Connection readConnection = DriverManager.getConnection(tenantConnectUrl, props)) {
 
             dataReader.setConnection(readConnection);
@@ -466,12 +622,12 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
             assertNotNull("Fetched data should not be null", fetchedData);
             assertEquals("Expired rows should not be fetched", 0, fetchedData.rowKeySet().size());
         }
-
+        EnvironmentEdgeManager.reset();
     }
 
     void validateRowsAreNotMaskedUsingCounts(long probeTimestamp, DataReader dataReader,
             SchemaBuilder schemaBuilder) throws SQLException {
-
+        EnvironmentEdgeManager.reset();
         String tenantConnectUrl =
                 getUrl() + ';' + TENANT_ID_ATTRIB + '=' + schemaBuilder.getDataOptions()
                         .getTenantId();
@@ -480,6 +636,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         long scnTimestamp = EnvironmentEdgeManager.currentTimeMillis() + 1;
         Properties props = new Properties();
         props.setProperty("CurrentSCN", Long.toString(scnTimestamp ));
+        injectEdge.setValue(scnTimestamp);
+        EnvironmentEdgeManager.injectEdge(injectEdge);
         try (Connection readConnection = DriverManager.getConnection(tenantConnectUrl, props)) {
 
             dataReader.setConnection(readConnection);
@@ -493,6 +651,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
         // Verify rows exists (not masked) at probed timestamp
         props.setProperty("CurrentSCN", Long.toString(probeTimestamp));
+        injectEdge.setValue(probeTimestamp);
         try (Connection readConnection = DriverManager.getConnection(tenantConnectUrl, props)) {
 
             dataReader.setConnection(readConnection);
@@ -503,6 +662,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
             assertTrue("Rows should exists before ttl expiration (probe-timestamp)",
                     fetchedData.rowKeySet().size() > 0);
         }
+        EnvironmentEdgeManager.reset();
     }
 
     static void verifyRowsBeforeTTLExpiration(
@@ -534,6 +694,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
             DataWriter dataWriter, int numRowsToUpsert) throws Exception {
         // Upsert rows
         dataWriter.upsertRows(1, numRowsToUpsert);
+        // To prevent edge cases when writes happen within the same ms
+        Thread.sleep(1);
         return dataWriter.getDataTable();
     }
 
@@ -631,29 +793,32 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         testCaseWhenAllCFMatchAndSame.setTenantViewCFs(Lists.newArrayList("A", "A", "A"));
         testCases.add(testCaseWhenAllCFMatchAndSame);
 
-        OtherOptions
-                testCaseWhenAllCFMatch = new OtherOptions();
-        testCaseWhenAllCFMatch.setTestName("testCaseWhenAllCFMatch");
-        testCaseWhenAllCFMatch.setTableCFs(Lists.newArrayList(null, "A", "B"));
-        testCaseWhenAllCFMatch.setGlobalViewCFs(Lists.newArrayList(null, "A", "B"));
-        testCaseWhenAllCFMatch.setTenantViewCFs(Lists.newArrayList(null, "A", "B"));
-        testCases.add(testCaseWhenAllCFMatch);
+        // conditional TTL expressions not supported for multiple column families
+        if (useCondExpression == false) {
+            OtherOptions
+                    testCaseWhenAllCFMatch = new OtherOptions();
+            testCaseWhenAllCFMatch.setTestName("testCaseWhenAllCFMatch");
+            testCaseWhenAllCFMatch.setTableCFs(Lists.newArrayList(null, "A", "B"));
+            testCaseWhenAllCFMatch.setGlobalViewCFs(Lists.newArrayList(null, "A", "B"));
+            testCaseWhenAllCFMatch.setTenantViewCFs(Lists.newArrayList(null, "A", "B"));
+            testCases.add(testCaseWhenAllCFMatch);
 
-        OtherOptions
-                testCaseWhenTableCFsAreDiff = new OtherOptions();
-        testCaseWhenTableCFsAreDiff.setTestName("testCaseWhenTableCFsAreDiff");
-        testCaseWhenTableCFsAreDiff.setTableCFs(Lists.newArrayList(null, "A", "B"));
-        testCaseWhenTableCFsAreDiff.setGlobalViewCFs(Lists.newArrayList("A", "A", "B"));
-        testCaseWhenTableCFsAreDiff.setTenantViewCFs(Lists.newArrayList("A", "A", "B"));
-        testCases.add(testCaseWhenTableCFsAreDiff);
+            OtherOptions
+                    testCaseWhenTableCFsAreDiff = new OtherOptions();
+            testCaseWhenTableCFsAreDiff.setTestName("testCaseWhenTableCFsAreDiff");
+            testCaseWhenTableCFsAreDiff.setTableCFs(Lists.newArrayList(null, "A", "B"));
+            testCaseWhenTableCFsAreDiff.setGlobalViewCFs(Lists.newArrayList("A", "A", "B"));
+            testCaseWhenTableCFsAreDiff.setTenantViewCFs(Lists.newArrayList("A", "A", "B"));
+            testCases.add(testCaseWhenTableCFsAreDiff);
 
-        OtherOptions
-                testCaseWhenGlobalAndTenantCFsAreDiff = new OtherOptions();
-        testCaseWhenGlobalAndTenantCFsAreDiff.setTestName("testCaseWhenGlobalAndTenantCFsAreDiff");
-        testCaseWhenGlobalAndTenantCFsAreDiff.setTableCFs(Lists.newArrayList(null, "A", "B"));
-        testCaseWhenGlobalAndTenantCFsAreDiff.setGlobalViewCFs(Lists.newArrayList("A", "A", "A"));
-        testCaseWhenGlobalAndTenantCFsAreDiff.setTenantViewCFs(Lists.newArrayList("B", "B", "B"));
-        testCases.add(testCaseWhenGlobalAndTenantCFsAreDiff);
+            OtherOptions
+                    testCaseWhenGlobalAndTenantCFsAreDiff = new OtherOptions();
+            testCaseWhenGlobalAndTenantCFsAreDiff.setTestName("testCaseWhenGlobalAndTenantCFsAreDiff");
+            testCaseWhenGlobalAndTenantCFsAreDiff.setTableCFs(Lists.newArrayList(null, "A", "B"));
+            testCaseWhenGlobalAndTenantCFsAreDiff.setGlobalViewCFs(Lists.newArrayList("A", "A", "A"));
+            testCaseWhenGlobalAndTenantCFsAreDiff.setTenantViewCFs(Lists.newArrayList("B", "B", "B"));
+            testCases.add(testCaseWhenGlobalAndTenantCFsAreDiff);
+        }
 
         return testCases;
     }
@@ -713,7 +878,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
             if (isMultiTenant) {
                 TenantViewOptions
                         tenantViewOptions = TenantViewOptions.withDefaults();
-                tenantViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+                tenantViewOptions.setTableProps(String.format("TTL='%s'",
+                        getTTLExpression(viewTTL)));
                 schemaBuilder
                         .withTableOptions(tableOptions)
                         .withTenantViewOptions(tenantViewOptions)
@@ -729,7 +895,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
                 globalViewOptions.setGlobalViewColumnTypes(Lists.newArrayList(COLUMN_TYPES));
                 globalViewOptions.setGlobalViewPKColumns(Lists.newArrayList(TENANT_VIEW_PK_COLUMNS));
                 globalViewOptions.setGlobalViewPKColumnTypes(Lists.newArrayList(TENANT_VIEW_PK_TYPES));
-                globalViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+                globalViewOptions.setTableProps(String.format("TTL='%s'",
+                        getTTLExpression(viewTTL)));
 
                 GlobalViewIndexOptions
                         globalViewIndexOptions = new GlobalViewIndexOptions();
@@ -863,7 +1030,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
         TenantViewOptions
                 tenantViewOptions = TenantViewOptions.withDefaults();
-        tenantViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+        tenantViewOptions.setTableProps(String.format("TTL='%s'", getTTLExpression(viewTTL)));
 
         // Define the test schema.
         final SchemaBuilder schemaBuilder = new SchemaBuilder(getUrl());
@@ -950,7 +1117,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
         GlobalViewOptions
                 globalViewOptions = GlobalViewOptions.withDefaults();
-        globalViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+        globalViewOptions.setTableProps(String.format("TTL='%s'", getTTLExpression(viewTTL)));
 
         GlobalViewIndexOptions
                 globalViewIndexOptions = GlobalViewIndexOptions.withDefaults();
@@ -1125,7 +1292,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
                 tenantViewOptions = new TenantViewOptions();
         tenantViewOptions.setTenantViewColumns(Lists.newArrayList(TENANT_VIEW_COLUMNS));
         tenantViewOptions.setTenantViewColumnTypes(Lists.newArrayList(COLUMN_TYPES));
-        tenantViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+        tenantViewOptions.setTableProps(String.format("TTL='%s'", getTTLExpression(viewTTL)));
 
         TenantViewIndexOptions
                 tenantViewIndexOptions = TenantViewIndexOptions.withDefaults();
@@ -1298,7 +1465,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         int viewTTL = VIEW_TTL_10_SECS;
         TableOptions
                 tableOptions = TableOptions.withDefaults();
-        String tableProps = "COLUMN_ENCODED_BYTES=0,DEFAULT_COLUMN_FAMILY='0',TTL=10";
+        String tableProps = String.format("COLUMN_ENCODED_BYTES=0,DEFAULT_COLUMN_FAMILY='0'," +
+                "TTL='%s'", getTTLExpression(viewTTL));
         tableOptions.setTableProps(tableProps);
         tableOptions.getTablePKColumns().add("ZID");
         tableOptions.getTablePKColumnTypes().add("CHAR(15)");
@@ -1484,7 +1652,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         int viewTTL = VIEW_TTL_10_SECS;
         TableOptions
                 tableOptions = TableOptions.withDefaults();
-        String tableProps = "COLUMN_ENCODED_BYTES=0,DEFAULT_COLUMN_FAMILY='0',TTL=10";
+        String tableProps = String.format("COLUMN_ENCODED_BYTES=0,DEFAULT_COLUMN_FAMILY='0'," +
+                "TTL='%s'", getTTLExpression(viewTTL));
         tableOptions.setTableProps(tableProps);
         tableOptions.setSaltBuckets(1);
         tableOptions.getTablePKColumns().add("ZID");
@@ -1680,7 +1849,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
         GlobalViewOptions
                 globalViewOptions = GlobalViewOptions.withDefaults();
-        globalViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+        globalViewOptions.setTableProps(String.format("TTL='%s'", getTTLExpression(viewTTL)));
 
         GlobalViewIndexOptions
                 globalViewIndexOptions = GlobalViewIndexOptions.withDefaults();
@@ -1858,7 +2027,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
         for (int tenant : tenantSet) {
             // Set TTL only when tenant in hasTTLSet
             if (hasTTLSet.contains(tenant)) {
-                tenantViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+                tenantViewOptions.setTableProps(String.format("TTL='%s'",
+                        getTTLExpression(viewTTL)));
             }
             // build schema for tenant
             schemaBuilder.getDataOptions().setTenantId(null);
@@ -2129,9 +2299,11 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
                 // Set TTL only when hasGlobalTTLSet OR hasTenantTTLSet
                 // View TTL is set to 10s => 10000 ms
                 if (hasGlobalTTLSet.contains(globalView)) {
-                    globalViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+                    globalViewOptions.setTableProps(String.format("TTL='%s'",
+                            getTTLExpression(viewTTL)));
                 } else if (hasTenantTTLSet.contains(tenant)) {
-                    tenantViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+                    tenantViewOptions.setTableProps(String.format("TTL='%s'",
+                            getTTLExpression(viewTTL)));
                 }
 
                 if (schemaBuilder.getDataOptions() != null) {
@@ -2139,13 +2311,18 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
                     switch (tenantType.getSqlType()) {
                     case Types.VARCHAR:
                     case Types.CHAR:
+                        // ensure a new tenantid is generated for every iteration of the test
                         schemaBuilder.getDataOptions().setTenantId(dataOptions.getNextTenantId());
                         break;
                     case Types.INTEGER:
-                        schemaBuilder.getDataOptions().setTenantId(Integer.toString(tenant*100000));
+                        // ensure a new tenantid is generated for every iteration of the test
+                        schemaBuilder.getDataOptions().setTenantId(Integer.toString(
+                                dataOptions.getNextTenantNumber()*100000));
                         break;
                     case Types.BIGINT:
-                        schemaBuilder.getDataOptions().setTenantId(Long.toString(tenant*10000000000l));
+                        // ensure a new tenantid is generated for every iteration of the test
+                        schemaBuilder.getDataOptions().setTenantId(Long.toString(
+                                dataOptions.getNextTenantNumber()*10000000000l));
                         break;
                     }
                 }
@@ -2316,10 +2493,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
                         validateRowsAreNotMaskedUsingCounts(scnTimestamp, dataReader, schemaBuilder);
                     }
                 }
-
             }
-
-
         }
 
         PTable table = schemaBuilder.getBaseTable();
@@ -2347,6 +2521,162 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
 
     }
 
+    protected void testMajorCompactTenantViewsWithVariousPKTypesAndSortOrder() throws Exception {
+        try {
+            List<PDataType[]> testCases = getTestCases();
+            SortOrder[][] sortOrders = getSortOrders();
+            for (PDataType[] aCase : testCases) {
+                for (SortOrder[] sortOrder : sortOrders) {
+                    runTenantViewsWithVariousPKTypes(aCase, sortOrder);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.info(LogUtil.getCallerStackTrace());
+            LOGGER.error(e.getMessage());
+        }
+
+    }
+
+    /**
+     * Test special case:
+     * Test with various PK Types and SortOrders
+     * This can occur when the TENANT_ID and global view PARTITION_KEY overlap.
+     * @throws Exception
+     */
+
+    private void runTenantViewsWithVariousPKTypes(PDataType[] pkDataTypes, SortOrder[] sortOrders) throws Exception {
+        // View TTL is set in seconds (for e.g 10 secs)
+        resetEnvironmentEdgeManager();
+        int viewTTL = VIEW_TTL_10_SECS;
+        // Define the test schema.
+        // 1. Table with columns => (ORG_ID, KP, COL1, COL2, COL3), PK => (ORG_ID, KP)
+        // 2. GlobalView with columns => (ID1, ID2, ID3, COL4, COL5, COL6), PK => (ID1, ID2, ID3)
+        // 3. Tenant with columns => (ZID, COL7, COL8, COL9), PK => (ZID)
+        final SchemaBuilder schemaBuilder = new SchemaBuilder(getUrl());
+
+        TableOptions
+                tableOptions = TableOptions.withDefaults();
+        tableOptions.setTableProps("");
+        tableOptions.setTableProps("COLUMN_ENCODED_BYTES=0,MULTI_TENANT=true,DEFAULT_COLUMN_FAMILY='0'");
+        tableOptions.setTablePKColumns(Arrays.asList("OID", "KP"));
+        tableOptions.setTablePKColumnTypes(Arrays.asList("CHAR(15)", "CHAR(3)"));
+
+        DataOptions dataOptions = DataOptions.withDefaults();
+        dataOptions.setTenantViewName("Z01");
+        dataOptions.setKeyPrefix("Z01");
+
+        GlobalViewOptions
+                globalViewOptions = GlobalViewOptions.withDefaults();
+        String[] globalViewPKNames = new String[] { "ID1", "ID2", "ID3" };
+        globalViewOptions.setGlobalViewPKColumns(asList(globalViewPKNames));
+        globalViewOptions.setGlobalViewPKColumnTypes(
+                asList(
+                        pkDataTypes[0].getSqlTypeName(),
+                        pkDataTypes[1].getSqlTypeName(),
+                        pkDataTypes[2].getSqlTypeName()
+                )
+        );
+        globalViewOptions.setGlobalViewPKColumnSort(asList(
+                sortOrders[0].name(),
+                sortOrders[1].name(),
+                sortOrders[2].name()
+        ));
+
+        TenantViewOptions
+                tenantViewOptions = TenantViewOptions.withDefaults();
+        tenantViewOptions.setTenantViewCondition(String.format(
+                "SELECT * FROM %s.%s %s",
+                dataOptions.getSchemaName(), dataOptions.getGlobalViewName(),
+                getWhereClause(globalViewPKNames, pkDataTypes)));
+        // View TTL is set to 10s => 10000 ms
+        tenantViewOptions.setTableProps(String.format("TTL='%s'", getTTLExpression(viewTTL)));
+
+        schemaBuilder.withTableOptions(tableOptions)
+                .withTenantViewOptions(tenantViewOptions);
+
+        schemaBuilder
+                .withDataOptions(dataOptions)
+                .withGlobalViewOptions(globalViewOptions)
+                .buildWithNewTenant();
+
+        // Define the test data.
+        DataSupplier
+                dataSupplier = new DataSupplier() {
+
+            @Override public List<Object> getValues(int rowIndex) {
+                Random rnd = new Random();
+                String zid = String.format(ZID_FMT, rowIndex);
+                String col1 = String.format(COL1_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col2 = String.format(COL2_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col3 = String.format(COL3_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col4 = String.format(COL4_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col5 = String.format(COL5_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col6 = String.format(COL6_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col7 = String.format(COL7_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col8 = String.format(COL8_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+                String col9 = String.format(COL9_FMT, rowIndex + rnd.nextInt(MAX_ROWS));
+
+                return Lists.newArrayList(
+                        new Object[] { col1, col2, col3, col4, col5, col6,
+                                zid, col7, col8, col9 });
+            }
+        };
+
+        long earliestTimestamp = EnvironmentEdgeManager.currentTimeMillis();
+        // Create a test data reader/writer for the above schema.
+        DataWriter
+                dataWriter = new BasicDataWriter();
+        DataReader
+                dataReader = new BasicDataReader();
+
+        List<String> columns =
+                Lists.newArrayList(
+                        "COL1", "COL2", "COL3", "COL4", "COL5",
+                        "COL6", "ZID", "COL7", "COL8", "COL9");
+        List<String> rowKeyColumns = Lists.newArrayList("ZID");
+        String tenantConnectUrl =
+                getUrl() + ';' + TENANT_ID_ATTRIB + '=' +
+                        schemaBuilder.getDataOptions().getTenantId();
+        try (Connection writeConnection = DriverManager
+                .getConnection(tenantConnectUrl)) {
+            writeConnection.setAutoCommit(true);
+            dataWriter.setConnection(writeConnection);
+            dataWriter.setDataSupplier(dataSupplier);
+            dataWriter.setUpsertColumns(columns);
+            dataWriter.setRowKeyColumns(rowKeyColumns);
+            dataWriter.setTargetEntity(schemaBuilder.getEntityTenantViewName());
+            org.apache.phoenix.thirdparty.com.google.common.collect.Table<String, String, Object>
+                    upsertedData =
+                    upsertData(dataWriter, DEFAULT_NUM_ROWS);
+
+            dataReader.setValidationColumns(columns);
+            dataReader.setRowKeyColumns(rowKeyColumns);
+            dataReader.setDML(String
+                    .format("SELECT %s from %s", Joiner.on(",").join(columns),
+                            schemaBuilder.getEntityTenantViewName()));
+            dataReader.setTargetEntity(schemaBuilder.getEntityTenantViewName());
+            long scnTimestamp = EnvironmentEdgeManager.currentTimeMillis();
+
+            validateExpiredRowsAreNotReturnedUsingData(viewTTL, upsertedData,
+                    dataReader, schemaBuilder);
+        }
+
+
+
+        PTable table = schemaBuilder.getBaseTable();
+        // validate multi-tenanted base table
+        validateAfterMajorCompaction(
+                table.getSchemaName().toString(),
+                table.getTableName().toString(),
+                false,
+                earliestTimestamp,
+                viewTTL,
+                false,
+                0
+        );
+    }
+
+
     /**
      * Test special case:
      * When there are overlapping row key prefixes.
@@ -2354,7 +2684,7 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
      * @throws Exception
      */
 
-    protected void testTenantViewsWIthOverlappingRowPrefixes() throws Exception {
+    protected void testTenantViewsWithOverlappingRowPrefixes() throws Exception {
         // View TTL is set in seconds (for e.g 10 secs)
         int viewTTL = VIEW_TTL_10_SECS;
         // Define the test schema.
@@ -2387,8 +2717,8 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
                 dataOptions.setGlobalViewName(dataOptions.getGlobalViewName() + "_1");
                 dataOptions.setTenantViewName("Z01");
                 dataOptions.setKeyPrefix("00D0t0002000001");
-                // View TTL is set to 300s => 300000 ms
-                globalViewOptions.setTableProps("TTL=10");
+                globalViewOptions.setTableProps(
+                        String.format("TTL='%s'", getTTLExpression(viewTTL)));
             } else {
                 dataOptions.setGlobalViewName(dataOptions.getGlobalViewName() + "_2");
                 dataOptions.setTenantViewName("Z02");
@@ -2556,9 +2886,11 @@ public abstract class BaseViewTTLIT extends ParallelStatsDisabledIT {
                 // Set TTL only when hasGlobalTTLSet OR hasTenantTTLSet
                 // View TTL is set to 10s => 10000 ms
                 if (hasGlobalTTLSet.contains(globalView)) {
-                    globalViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+                    globalViewOptions.setTableProps(
+                            String.format("TTL='%s'", getTTLExpression(viewTTL)));
                 } else if (hasTenantTTLSet.contains(tenant)) {
-                    tenantViewOptions.setTableProps(String.format("TTL=%d", viewTTL));
+                    tenantViewOptions.setTableProps(
+                            String.format("TTL='%s'", getTTLExpression(viewTTL)));
                 }
 
                 // build schema for tenant

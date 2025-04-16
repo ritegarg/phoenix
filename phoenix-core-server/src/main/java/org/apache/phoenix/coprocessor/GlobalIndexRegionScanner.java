@@ -22,7 +22,6 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HConstants;
-
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
@@ -36,12 +35,12 @@ import org.apache.hadoop.hbase.regionserver.Region;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
-import org.apache.phoenix.execute.MutationState;
-import org.apache.phoenix.hbase.index.IndexRegionObserver;
-import org.apache.phoenix.hbase.index.ValueGetter;
 import org.apache.phoenix.compile.ScanRanges;
 import org.apache.phoenix.coprocessorclient.BaseScannerRegionObserverConstants;
+import org.apache.phoenix.execute.MutationState;
 import org.apache.phoenix.filter.SkipScanFilter;
+import org.apache.phoenix.hbase.index.IndexRegionObserver;
+import org.apache.phoenix.hbase.index.ValueGetter;
 import org.apache.phoenix.hbase.index.parallel.EarlyExitFailure;
 import org.apache.phoenix.hbase.index.parallel.TaskBatch;
 import org.apache.phoenix.hbase.index.parallel.TaskRunner;
@@ -51,8 +50,8 @@ import org.apache.phoenix.hbase.index.parallel.WaitForCompletionTaskRunner;
 import org.apache.phoenix.hbase.index.table.HTableFactory;
 import org.apache.phoenix.hbase.index.util.GenericKeyValueBuilder;
 import org.apache.phoenix.hbase.index.util.ImmutableBytesPtr;
-import org.apache.phoenix.hbase.index.write.IndexWriterUtils;
 import org.apache.phoenix.hbase.index.util.IndexManagementUtil;
+import org.apache.phoenix.hbase.index.write.IndexWriterUtils;
 import org.apache.phoenix.index.IndexMaintainer;
 import org.apache.phoenix.index.PhoenixIndexCodec;
 import org.apache.phoenix.jdbc.PhoenixConnection;
@@ -61,22 +60,22 @@ import org.apache.phoenix.mapreduce.index.IndexVerificationOutputRepository;
 import org.apache.phoenix.mapreduce.index.IndexVerificationResultRepository;
 import org.apache.phoenix.query.KeyRange;
 import org.apache.phoenix.query.QueryServicesOptions;
+import org.apache.phoenix.schema.CompiledConditionalTTLExpression;
+import org.apache.phoenix.schema.CompiledTTLExpression;
 import org.apache.phoenix.schema.PTable;
 import org.apache.phoenix.schema.SortOrder;
-import org.apache.phoenix.schema.TableNotFoundException;
 import org.apache.phoenix.schema.transform.TransformMaintainer;
 import org.apache.phoenix.schema.types.PVarbinary;
 import org.apache.phoenix.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.phoenix.thirdparty.com.google.common.collect.Lists;
 import org.apache.phoenix.thirdparty.com.google.common.collect.Maps;
 import org.apache.phoenix.util.ClientUtil;
-import org.apache.phoenix.util.ByteUtil;
 import org.apache.phoenix.util.EnvironmentEdgeManager;
 import org.apache.phoenix.util.IndexUtil;
-import org.apache.phoenix.util.QueryUtil;
-import org.apache.phoenix.util.ServerUtil;
 import org.apache.phoenix.util.MetaDataUtil;
+import org.apache.phoenix.util.QueryUtil;
 import org.apache.phoenix.util.ScanUtil;
+import org.apache.phoenix.util.ServerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +171,7 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
     protected byte[] logicalTableName;
     protected byte[] tableType;
     protected byte[] lastDdlTimestamp;
+    private final CompiledTTLExpression ttlExpression;
 
     // This relies on Hadoop Configuration to handle warning about deprecated configs and
     // to set the correct non-deprecated configs when an old one shows up.
@@ -219,6 +219,7 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
         tableType = scan.getAttribute(MutationState.MutationMetadataType.TABLE_TYPE.toString());
         lastDdlTimestamp = scan.getAttribute(
                 MutationState.MutationMetadataType.TIMESTAMP.toString());
+        ttlExpression = ScanUtil.getTTLExpression(scan);
         byte[] transforming = scan.getAttribute(BaseScannerRegionObserverConstants.DO_TRANSFORMING);
         List<IndexMaintainer> maintainers = null;
         if (transforming == null) {
@@ -434,12 +435,6 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
     }
 
     @VisibleForTesting
-    public int setIndexTableTTL(int ttl) {
-        indexTableTTL = ttl;
-        return 0;
-    }
-
-    @VisibleForTesting
     public int setIndexMaintainer(IndexMaintainer indexMaintainer) {
         this.indexMaintainer = indexMaintainer;
         return 0;
@@ -613,17 +608,6 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
         }
     };
 
-    private boolean isDeleteFamily(Mutation mutation) {
-        for (List<Cell> cells : mutation.getFamilyCellMap().values()) {
-            for (Cell cell : cells) {
-                if (cell.getType() == Cell.Type.DeleteFamily) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private void updateUnverifiedIndexRowCounters(Put actual, long expectedTs, List<Mutation> indexRowsToBeDeleted,
                                                   IndexToolVerificationResult.PhaseResult verificationPhaseResult) {
         // Get the empty column of the given index row
@@ -738,7 +722,8 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
         while (iterator.hasNext()) {
             Mutation mutation = iterator.next();
             if ((mutation instanceof Put && !isVerified((Put) mutation)) ||
-                    (mutation instanceof Delete && !isDeleteFamily(mutation))) {
+                    (mutation instanceof Delete
+                            && !IndexUtil.isDeleteFamilyOrDeleteColumn(mutation))) {
                 iterator.remove();
             } else {
                 if (((previous instanceof Put && mutation instanceof Put) ||
@@ -787,6 +772,11 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
      * index rebuilds, the delete family markers are used to delete index rows due to data table row deletes or
      * data table row overwrites.
      *
+     * Delete Column Markers
+     * Delete column markers are generated during read repair, regular table updates and
+     * index rebuilds. The delete column markers are used for any included column in the index
+     * which is set to null.
+     *
      * Verification Algorithm
      *
      * IndexTool verification generates an expected list of index mutations from the data table rows and uses this list
@@ -797,7 +787,9 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
      *
      * Every mutation will include a set of cells with the same timestamp
      * Every mutation has a different timestamp
-     * A delete mutation will include only delete family cells and it is for deleting the entire row and its versions
+     * A delete mutation can either include delete family cells and it is for deleting the entire
+     * row and its versions or delete column cells. The delete column cells are added for those
+     * included columns in the index which are set to null.
      * Every put mutation is verified
      *
      * For both verification types, after the expected list of index mutations is constructed for a given data table,
@@ -807,7 +799,8 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
      * As in the construction for the expected list, the cells are grouped into a put and a delete set. The put and
      * delete sets for a given row are further grouped based on their timestamps into put and delete mutations such that
      * all the cells in a mutation have the timestamps. The put and delete mutations are then sorted within a single
-     * list. Mutations in this list are sorted in ascending order of their timestamp. This list is the actual list.
+     * list. Mutations in this list are sorted in descending order of their timestamp.
+     * This list is the actual list.
      *
      * For the without-repair verification, unverified mutations and family version delete markers are removed from
      * the actual list and then the list is compared with the expected list.
@@ -857,22 +850,14 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
         while (expectedIndex < expectedSize && actualIndex <actualSize) {
             previousExpected = expected;
             expected = expectedMutationList.get(expectedIndex);
-            // Check if cell expired as per the current server's time and data table ttl
-            // Index table should have the same ttl as the data table, hence we might not
-            // get a value back from index if it has already expired between our rebuild and
-            // verify
-            // TODO: have a metric to update for these cases
-            if (isTimestampBeforeTTL(indexTableTTL, currentTime, getTimestamp(expected))) {
-                verificationPhaseResult.setExpiredIndexRowCount(verificationPhaseResult.getExpiredIndexRowCount() + 1);
-                return true;
-            }
             actual = actualMutationList.get(actualIndex);
             if (expected instanceof Put) {
                 if (previousExpected instanceof Delete) {
                     // Between an expected delete and put, there can be one or more deletes due to
                     // concurrent mutations or data table write failures. Skip all of them if any
                     // There cannot be any actual delete mutation between two expected put mutations.
-                    while (getTimestamp(actual) >= getTimestamp(expected) && actual instanceof Delete) {
+                    while (getTimestamp(actual) >= getTimestamp(expected)
+                            && IndexUtil.isDeleteFamily(actual)) {
                         actualIndex++;
                         if (actualIndex == actualSize) {
                             break;
@@ -892,9 +877,13 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
                     continue;
                 }
             } else { // expected instanceof Delete
-                // Between put and delete, delete and delete, or before the first delete, there can be other deletes.
-                // Skip all of them if any
-                while (getTimestamp(actual) > getTimestamp(expected) && actual instanceof Delete) {
+                // Between put and delete, delete and delete, or before the first delete, there can
+                // be other deletes. Skip all of them if any. This can happen when there are
+                // unverified index rows on a deleted row and read-repair will put a DeleteFamily
+                // marker. Those delete family markers will be visible until compaction runs on the
+                // index table.
+                while (getTimestamp(actual) > getTimestamp(expected)
+                        && IndexUtil.isDeleteFamily(actual)) {
                     actualIndex++;
                     if (actualIndex == actualSize) {
                         break;
@@ -904,8 +893,7 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
                 if (actualIndex == actualSize) {
                     break;
                 }
-                if (getTimestamp(actual) == getTimestamp(expected) &&
-                        (actual instanceof Delete && isDeleteFamily(actual))) {
+                if (isMatchingMutation(expected, actual)) {
                     expectedIndex++;
                     actualIndex++;
                     continue;
@@ -997,21 +985,6 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
                 ClientUtil.throwIOException(region.getRegionInfo().getRegionNameAsString(), t);
             }
         }
-        List<byte[]> expiredIndexRows = new ArrayList<>();
-        // Check if any expected rows from index(which we didn't get) are already expired due to TTL
-        // TODO: metrics for expired rows
-        long currentTime = EnvironmentEdgeManager.currentTimeMillis();
-        for (Map.Entry<byte[], List<Mutation>> entry: expectedIndexMutationMap.entrySet()) {
-            List<Mutation> mutationList = entry.getValue();
-            if (isTimestampBeforeTTL(indexTableTTL, currentTime, getTimestamp(mutationList.get(mutationList.size() - 1)))) {
-                verificationPhaseResult.setExpiredIndexRowCount(verificationPhaseResult.getExpiredIndexRowCount() + 1);
-                expiredIndexRows.add(entry.getKey());
-            }
-        }
-        // Remove the expired rows from indexMutationMap
-        for (byte[] indexKey : expiredIndexRows) {
-            expectedIndexMutationMap.remove(indexKey);
-        }
         // Count and log missing rows
         for (Map.Entry<byte[], List<Mutation>> entry: expectedIndexMutationMap.entrySet()) {
             byte[] indexKey = entry.getKey();
@@ -1020,7 +993,7 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
             if (mutation instanceof Delete) {
                 continue;
             }
-            currentTime = EnvironmentEdgeManager.currentTimeMillis();
+            long currentTime = EnvironmentEdgeManager.currentTimeMillis();
             String errorMsg;
             IndexVerificationOutputRepository.IndexVerificationErrorType errorType;
             if (isTimestampBeyondMaxLookBack(maxLookBackInMills, currentTime, getTimestamp(mutation))){
@@ -1179,7 +1152,8 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
     };
 
     public static List<Mutation> getMutationsWithSameTS(Put put, Delete del) {
-        // Reorder the mutations on the same row so that delete comes before put when they have the same timestamp
+        // Reorder the mutations on the same row so that put comes before delete when they
+        // have the same timestamp
         return getMutationsWithSameTS(put, del, MUTATION_TS_COMPARATOR);
     }
 
@@ -1277,10 +1251,15 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
      * uncovered partial indexes.
      * pendingMutations is a sorted list of data table mutations that are used to replay index
      * table mutations. This list is sorted in ascending order by the tuple of row key, timestamp
-     * and mutation type where delete comes after put.
+     * and mutation type where put comes before delete.
      */
-    public static List<Mutation> prepareIndexMutationsForRebuild(IndexMaintainer indexMaintainer,
-            Put dataPut, Delete dataDel, byte[] encodedRegionName) throws IOException {
+    public static List<Mutation> prepareIndexMutationsForRebuild(
+            IndexMaintainer indexMaintainer,
+            Put dataPut,
+            Delete dataDel,
+            byte[] encodedRegionName,
+            CompiledTTLExpression ttlExpr) throws IOException {
+        boolean isCondTTL = ttlExpr instanceof CompiledConditionalTTLExpression;
         List<Mutation> dataMutations = getMutationsWithSameTS(dataPut, dataDel);
         List<Mutation> indexMutations = Lists.newArrayListWithExpectedSize(dataMutations.size());
         // The row key ptr of the data table row for which we will build index rows here
@@ -1292,6 +1271,18 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
         byte[] indexRowKeyForCurrentDataRow = null;
         int dataMutationListSize = dataMutations.size();
         for (int i = 0; i < dataMutationListSize; i++) {
+            if (isCondTTL && currentDataRowState != null) {
+                CompiledConditionalTTLExpression condExpr =
+                        (CompiledConditionalTTLExpression) ttlExpr;
+                List<Cell> currentRow = flattenCells(currentDataRowState);
+                // isRaw is false because we are looking at a Put mutation
+                if (condExpr.isExpired(currentRow, false)) {
+                    // an update on an expired version is like a new row
+                    // reset the state before applying the new version
+                    currentDataRowState = null;
+                    indexRowKeyForCurrentDataRow = null;
+                }
+            }
             Mutation mutation = dataMutations.get(i);
             long ts = getTimestamp(mutation);
             Delete deleteToApply = null;
@@ -1343,6 +1334,10 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
                     Put indexPut = prepareIndexPutForRebuild(indexMaintainer, rowKeyPtr,
                             nextDataRowVG, ts, encodedRegionName);
                     indexMutations.add(indexPut);
+                    Delete deleteColumn = indexMaintainer.buildDeleteColumnMutation(indexPut, ts);
+                    if (deleteColumn != null) {
+                        indexMutations.add(deleteColumn);
+                    }
                     // Delete the current index row if the new index key is different than the current one
                     if (indexRowKeyForCurrentDataRow != null) {
                         if (Bytes.compareTo(indexPut.getRow(), indexRowKeyForCurrentDataRow) != 0) {
@@ -1401,6 +1396,10 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
                     Put indexPut = prepareIndexPutForRebuild(indexMaintainer, rowKeyPtr,
                             nextDataRowVG, ts, encodedRegionName);
                     indexMutations.add(indexPut);
+                    Delete deleteColumn = indexMaintainer.buildDeleteColumnMutation(indexPut, ts);
+                    if (deleteColumn != null) {
+                        indexMutations.add(deleteColumn);
+                    }
                     // Delete the current index row if the new index key is different than the current one
                     if (indexRowKeyForCurrentDataRow != null) {
                         if (Bytes.compareTo(indexPut.getRow(), indexRowKeyForCurrentDataRow) != 0) {
@@ -1420,13 +1419,21 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
         return indexMutations;
     }
 
+    private static List<Cell> flattenCells(Mutation m) {
+        List<Cell> flattenedCells = Lists.newArrayList();
+        for (List<Cell> cells : m.getFamilyCellMap().values()) {
+            flattenedCells.addAll(cells);
+        }
+        return flattenedCells;
+    }
+
     @VisibleForTesting
     public int prepareIndexMutations(Put put, Delete del, Map<byte[], List<Mutation>> indexMutationMap,
                                      Set<byte[]> mostRecentIndexRowKeys) throws IOException {
         List<Mutation> indexMutations;
 
         indexMutations = prepareIndexMutationsForRebuild(indexMaintainer, put, del,
-                region.getRegionInfo().getEncodedNameAsBytes());
+                region.getRegionInfo().getEncodedNameAsBytes(), ttlExpression);
         Collections.reverse(indexMutations);
 
         boolean mostRecentDone = false;
@@ -1439,7 +1446,7 @@ public abstract class GlobalIndexRegionScanner extends BaseRegionScanner {
             List<Mutation> mutationList = indexMutationMap.get(indexRowKey);
             if (mutationList == null) {
                 if (!mostRecentDone) {
-                    if (mutation instanceof Put) {
+                    if (mutation instanceof Put || IndexUtil.isDeleteColumn(mutation)) {
                         mostRecentIndexRowKeys.add(indexRowKey);
                         mostRecentDone = true;
                     }
