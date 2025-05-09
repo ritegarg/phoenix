@@ -154,7 +154,6 @@
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <!-- This overrides the property in the ASF parent project-->
     <version.maven-site-plugin>3.21.0</version.maven-site-plugin>
-    <mvel2.version>2.5.2.Final</mvel2.version>
     <maven-assembly-plugin.version>3.3.0</maven-assembly-plugin.version>
     <surefire.version>3.0.0-M6</surefire.version>
     <maven-javadoc-plugin.version>3.4.0</maven-javadoc-plugin.version>
@@ -1547,18 +1546,6 @@
           <exclusion>
             <groupId>javax.servlet</groupId>
             <artifactId>servlet-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-
-      <dependency>
-        <groupId>org.mvel</groupId>
-        <artifactId>mvel2</artifactId>
-        <version>${mvel2.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.thoughtworks.xstream</groupId>
-            <artifactId>xstream</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
