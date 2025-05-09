@@ -30,7 +30,6 @@ import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.IMMUTABLE_ROWS;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.IMMUTABLE_STORAGE_SCHEME;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.INDEX_STATE;
-import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.MAX_LOOKBACK_AGE;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.MULTI_TENANT;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.PHYSICAL_TABLE_NAME;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.SALT_BUCKETS;
@@ -223,7 +222,6 @@ public class PTableImpl implements PTable {
     private String indexWhere;
     private Expression indexWhereExpression;
     private Set<ColumnReference> indexWhereColumns;
-    private Long maxLookbackAge;
     private Map<PTableKey, Long> ancestorLastDDLTimestampMap;
     private Set<CDCChangeScope> cdcIncludeScopes;
 
@@ -291,7 +289,6 @@ public class PTableImpl implements PTable {
         private String streamingTopicName;
         private Set<CDCChangeScope> cdcIncludeScopes;
         private String indexWhere;
-        private Long maxLookbackAge;
         private Map<PTableKey, Long> ancestorLastDDLTimestampMap = new HashMap<>();
         private TTLExpression ttl = TTL_EXPRESSION_NOT_DEFINED;
         private byte[] rowKeyMatcher;
@@ -721,14 +718,6 @@ public class PTableImpl implements PTable {
             return this;
         }
 
-        public Builder setMaxLookbackAge(Long maxLookbackAge) {
-            if (maxLookbackAge != null) {
-                propertyValues.put(MAX_LOOKBACK_AGE, String.valueOf(maxLookbackAge));
-            }
-            this.maxLookbackAge = maxLookbackAge;
-            return this;
-        }
-
         public Builder setAncestorLastDDLTimestampMap(Map<PTableKey, Long> map) {
             this.ancestorLastDDLTimestampMap = map;
             return this;
@@ -1032,7 +1021,6 @@ public class PTableImpl implements PTable {
         this.streamingTopicName = builder.streamingTopicName;
         this.cdcIncludeScopes = builder.cdcIncludeScopes;
         this.indexWhere = builder.indexWhere;
-        this.maxLookbackAge = builder.maxLookbackAge;
         this.ancestorLastDDLTimestampMap = builder.ancestorLastDDLTimestampMap;
         this.rowKeyMatcher = builder.rowKeyMatcher;
     }
@@ -1113,7 +1101,6 @@ public class PTableImpl implements PTable {
                 .setExternalSchemaId(table.getExternalSchemaId())
                 .setStreamingTopicName(table.getStreamingTopicName())
                 .setIndexWhere(table.getIndexWhere())
-                .setMaxLookbackAge(table.getMaxLookbackAge())
                 .setCDCIncludeScopes(table.getCDCIncludeScopes())
                 .setAncestorLastDDLTimestampMap(table.getAncestorLastDDLTimestampMap())
                 .setTTL(table.getTTLExpression())
@@ -2073,10 +2060,6 @@ public class PTableImpl implements PTable {
             indexWhere =
                     (String) PVarchar.INSTANCE.toObject(table.getIndexWhere().toByteArray());
         }
-        Long maxLookbackAge = null;
-        if (table.hasMaxLookbackAge()) {
-            maxLookbackAge = table.getMaxLookbackAge();
-        }
         String cdcIncludeScopesStr = null;
         if (table.hasCDCIncludeScopes()) {
             cdcIncludeScopesStr = table.getCDCIncludeScopes();
@@ -2150,7 +2133,6 @@ public class PTableImpl implements PTable {
                     .setCDCIncludeScopes(
                             CDCUtil.makeChangeScopeEnumsFromString(cdcIncludeScopesStr))
                     .setIndexWhere(indexWhere)
-                    .setMaxLookbackAge(maxLookbackAge)
                     .setTTL(ttl)
                     .setRowKeyMatcher(rowKeyMatcher)
                     .build();
@@ -2311,9 +2293,6 @@ public class PTableImpl implements PTable {
         if (table.getIndexWhere() != null) {
             builder.setIndexWhere(UnsafeByteOperations.unsafeWrap(PVarchar.INSTANCE.toBytes(
                     table.getIndexWhere())));
-        }
-        if (table.getMaxLookbackAge() != null) {
-            builder.setMaxLookbackAge(table.getMaxLookbackAge());
         }
         builder.setCDCIncludeScopes(CDCUtil.makeChangeScopeStringFromEnums(
                 table.getCDCIncludeScopes() != null ? table.getCDCIncludeScopes()
@@ -2477,11 +2456,6 @@ public class PTableImpl implements PTable {
     @Override
     public String getIndexWhere() {
         return indexWhere;
-    }
-
-    @Override
-    public Long getMaxLookbackAge() {
-        return maxLookbackAge;
     }
 
     @Override
