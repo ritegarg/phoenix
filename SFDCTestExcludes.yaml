@@ -3,5 +3,8 @@
 - suite: org.apache.phoenix.end2end.transform.TransformMonitorExtendedIT
 - suite: org.apache.phoenix.end2end.index.MutableIndexFailureIT
 - suite: org.apache.phoenix.jdbc.LoggingHAConnectionLimiterIT
+- suite: org.apache.phoenix.end2end.PermissionNSDisabledIT
+  testcases:
+    - testSuperUserCanChangePerms
 - suite: org.apache.hadoop.hbase.regionserver.wal.WALRecoveryRegionPostOpenIT
   is_permanent: true
