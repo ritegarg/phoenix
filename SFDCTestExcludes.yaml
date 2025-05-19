@@ -4,6 +4,6 @@
 - suite: org.apache.phoenix.end2end.index.MutableIndexFailureIT
 - suite: org.apache.phoenix.jdbc.LoggingHAConnectionLimiterIT
 - suite: org.apache.phoenix.end2end.PermissionNSDisabledIT
-- suite: org.apache.phoenix,end2end.PermissionNSEnabledIT
+- suite: org.apache.phoenix.end2end.PermissionNSEnabledIT
 - suite: org.apache.hadoop.hbase.regionserver.wal.WALRecoveryRegionPostOpenIT
   is_permanent: true
