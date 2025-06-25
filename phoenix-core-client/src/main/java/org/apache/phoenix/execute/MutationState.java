@@ -780,11 +780,6 @@ public class MutationState implements SQLCloseable {
                             mutation.setAttribute(PhoenixIndexBuilderHelper.RETURN_RESULT,
                                     PhoenixIndexBuilderHelper.RETURN_RESULT_ROW);
                         }
-                    } else if (this.returnResult == ReturnResult.OLD_ROW) {
-                        for (Mutation mutation : rowMutations) {
-                            mutation.setAttribute(PhoenixIndexBuilderHelper.RETURN_RESULT,
-                                    PhoenixIndexBuilderHelper.RETURN_RESULT_OLD_ROW);
-                        }
                     }
                 }
                 // The DeleteCompiler already generates the deletes for indexes, so no need to do it again
@@ -810,9 +805,6 @@ public class MutationState implements SQLCloseable {
                         if (this.returnResult == ReturnResult.ROW) {
                             mutation.setAttribute(PhoenixIndexBuilderHelper.RETURN_RESULT,
                                     PhoenixIndexBuilderHelper.RETURN_RESULT_ROW);
-                        } else if (this.returnResult == ReturnResult.OLD_ROW) {
-                            mutation.setAttribute(PhoenixIndexBuilderHelper.RETURN_RESULT,
-                                    PhoenixIndexBuilderHelper.RETURN_RESULT_OLD_ROW);
                         }
                     }
                 }
@@ -1527,8 +1519,7 @@ public class MutationState implements SQLCloseable {
                                         .decodeInt(cell.getValueArray(), cell.getValueOffset(),
                                                 SortOrder.getDefault());
                                 if (this.returnResult != null) {
-                                    if (this.returnResult == ReturnResult.ROW ||
-                                            this.returnResult == ReturnResult.OLD_ROW) {
+                                    if (this.returnResult == ReturnResult.ROW) {
                                         this.result = result;
                                     }
                                 }
@@ -2402,8 +2393,7 @@ public class MutationState implements SQLCloseable {
     }
 
     public enum ReturnResult {
-        ROW,
-        OLD_ROW
+        ROW
     }
 
 }
