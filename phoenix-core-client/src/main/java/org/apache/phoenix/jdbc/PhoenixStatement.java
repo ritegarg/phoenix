@@ -1167,15 +1167,10 @@ public class PhoenixStatement implements PhoenixMonitoredStatement, SQLCloseable
     }
 
     private static class ExecutableUpsertStatement extends UpsertStatement implements CompilableStatement {
-
-        private ExecutableUpsertStatement(NamedTableNode table, HintNode hintNode,
-                                          List<ColumnName> columns,
-                                          List<ParseNode> values, SelectStatement select,
-                                          int bindCount, Map<String, UDFParseNode> udfParseNodes,
-                                          List<Pair<ColumnName, ParseNode>> onDupKeyPairs,
-                                          OnDuplicateKeyType onDupKeyType) {
-            super(table, hintNode, columns, values, select, bindCount, udfParseNodes, onDupKeyPairs,
-                    onDupKeyType);
+        private ExecutableUpsertStatement(NamedTableNode table, HintNode hintNode, List<ColumnName> columns,
+                List<ParseNode> values, SelectStatement select, int bindCount, Map<String, UDFParseNode> udfParseNodes,
+                List<Pair<ColumnName, ParseNode>> onDupKeyPairs) {
+            super(table, hintNode, columns, values, select, bindCount, udfParseNodes, onDupKeyPairs);
         }
 
         @SuppressWarnings("unchecked")
@@ -2045,14 +2040,9 @@ public class PhoenixStatement implements PhoenixMonitoredStatement, SQLCloseable
         }
 
         @Override
-        public ExecutableUpsertStatement upsert(NamedTableNode table, HintNode hintNode,
-                                                List<ColumnName> columns, List<ParseNode> values,
-                                                SelectStatement select, int bindCount,
-                                                Map<String, UDFParseNode> udfParseNodes,
-                                                List<Pair<ColumnName, ParseNode>> onDupKeyPairs,
-                                                UpsertStatement.OnDuplicateKeyType onDupKeyType) {
-            return new ExecutableUpsertStatement(table, hintNode, columns, values, select,
-                    bindCount, udfParseNodes, onDupKeyPairs, onDupKeyType);
+        public ExecutableUpsertStatement upsert(NamedTableNode table, HintNode hintNode, List<ColumnName> columns, List<ParseNode> values, SelectStatement select, int bindCount, 
+                Map<String, UDFParseNode> udfParseNodes, List<Pair<ColumnName,ParseNode>> onDupKeyPairs) {
+            return new ExecutableUpsertStatement(table, hintNode, columns, values, select, bindCount, udfParseNodes, onDupKeyPairs);
         }
 
         @Override

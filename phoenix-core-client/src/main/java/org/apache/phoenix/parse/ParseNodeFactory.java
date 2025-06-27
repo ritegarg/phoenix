@@ -861,13 +861,11 @@ public class ParseNodeFactory {
                 orderBy == null ? Collections.<OrderByNode>emptyList() : orderBy, limit, offset, bindCount, isAggregate, hasSequence, selects == null ? Collections.<SelectStatement>emptyList() : selects, udfParseNodes);
     } 
     
-    public UpsertStatement upsert(NamedTableNode table, HintNode hint, List<ColumnName> columns,
-                                  List<ParseNode> values, SelectStatement select,
-                                  int bindCount, Map<String, UDFParseNode> udfParseNodes,
-                                  List<Pair<ColumnName, ParseNode>> onDupKeyPairs,
-                                  UpsertStatement.OnDuplicateKeyType onDupKeyType) {
-        return new UpsertStatement(table, hint, columns, values, select, bindCount, udfParseNodes,
-                onDupKeyPairs, onDupKeyType);
+    public UpsertStatement upsert(NamedTableNode table, HintNode hint, List<ColumnName> columns, List<ParseNode> values,
+            SelectStatement select, int bindCount, 
+            Map<String, UDFParseNode> udfParseNodes,
+            List<Pair<ColumnName,ParseNode>> onDupKeyPairs) {
+        return new UpsertStatement(table, hint, columns, values, select, bindCount, udfParseNodes, onDupKeyPairs);
     }
 
     public CursorName cursorName(String name){
