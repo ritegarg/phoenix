@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.apache.phoenix.compat.hbase.ByteStringer;
 import org.apache.phoenix.coprocessor.generated.PFunctionProtos;
 import org.apache.phoenix.coprocessor.generated.PFunctionProtos.PFunctionArg;
 import org.apache.phoenix.expression.LiteralExpression;
@@ -207,7 +207,7 @@ public class PFunction implements PMetaDataEntity {
     public static PFunctionProtos.PFunction toProto(PFunction function) {
         PFunctionProtos.PFunction.Builder builder = PFunctionProtos.PFunction.newBuilder();
         if(function.getTenantId() != null){
-          builder.setTenantId(UnsafeByteOperations.unsafeWrap(function.getTenantId().getBytes()));
+          builder.setTenantId(ByteStringer.wrap(function.getTenantId().getBytes()));
         }
         builder.setFunctionName(function.getFunctionName());
         builder.setClassname(function.getClassName());

@@ -18,7 +18,7 @@
 package org.apache.phoenix.schema;
 
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.apache.phoenix.compat.hbase.ByteStringer;
 import org.apache.phoenix.coprocessor.generated.PTableProtos;
 import org.apache.phoenix.query.QueryConstants;
 import org.apache.phoenix.schema.types.PDataType;
@@ -319,9 +319,9 @@ public class PColumnImpl implements PColumn {
 
     public static PTableProtos.PColumn toProto(PColumn column) {
         PTableProtos.PColumn.Builder builder = PTableProtos.PColumn.newBuilder();
-        builder.setColumnNameBytes(UnsafeByteOperations.unsafeWrap(column.getName().getBytes()));
+        builder.setColumnNameBytes(ByteStringer.wrap(column.getName().getBytes()));
         if (column.getFamilyName() != null) {
-            builder.setFamilyNameBytes(UnsafeByteOperations.unsafeWrap(column.getFamilyName().getBytes()));
+            builder.setFamilyNameBytes(ByteStringer.wrap(column.getFamilyName().getBytes()));
         }
         if (column.getDataType()!=null) {
             builder.setDataType(column.getDataType().getSqlTypeName());
@@ -341,7 +341,7 @@ public class PColumnImpl implements PColumn {
             builder.setArraySize(column.getArraySize());
         }
         if (column.getViewConstant() != null) {
-            builder.setViewConstant(UnsafeByteOperations.unsafeWrap(column.getViewConstant()));
+            builder.setViewConstant(ByteStringer.wrap(column.getViewConstant()));
         }
         builder.setViewReferenced(column.isViewReferenced());
         
@@ -350,7 +350,7 @@ public class PColumnImpl implements PColumn {
         }
         builder.setIsRowTimestamp(column.isRowTimestamp());
         if (column.getColumnQualifierBytes() != null) {
-            builder.setColumnQualifierBytes(UnsafeByteOperations.unsafeWrap(column.getColumnQualifierBytes()));
+            builder.setColumnQualifierBytes(ByteStringer.wrap(column.getColumnQualifierBytes()));
         }
         if (column.getTimestamp() != HConstants.LATEST_TIMESTAMP) {
             builder.setTimestamp(column.getTimestamp());

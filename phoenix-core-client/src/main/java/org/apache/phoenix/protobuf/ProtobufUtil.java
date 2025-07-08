@@ -29,9 +29,9 @@ import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos.MutationProto.MutationType;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.phoenix.compat.hbase.ByteStringer;
 import org.apache.hbase.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
-import org.apache.hbase.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.phoenix.coprocessor.generated.ChildLinkMetaDataProtos.CreateViewAddChildLinkRequest;
 import org.apache.phoenix.coprocessor.generated.MetaDataProtos;
 import org.apache.phoenix.coprocessor.generated.PTableProtos;
@@ -149,7 +149,7 @@ public class ProtobufUtil {
     public static ServerCachingProtos.ImmutableBytesWritable toProto(ImmutableBytesWritable w) {
         ServerCachingProtos.ImmutableBytesWritable.Builder builder = 
         		ServerCachingProtos.ImmutableBytesWritable.newBuilder();
-        builder.setByteArray(UnsafeByteOperations.unsafeWrap(w.get()));
+        builder.setByteArray(ByteStringer.wrap(w.get()));
         builder.setOffset(w.getOffset());
         builder.setLength(w.getLength());
         return builder.build();
