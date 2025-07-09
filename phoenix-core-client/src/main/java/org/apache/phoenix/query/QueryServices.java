@@ -107,10 +107,10 @@ public interface QueryServices extends SQLCloseable {
     public static final String MUTATE_BATCH_SIZE_BYTES_ATTRIB = "phoenix.mutate.batchSizeBytes";
     public static final String MAX_SERVER_CACHE_TIME_TO_LIVE_MS_ATTRIB = "phoenix.coprocessor.maxServerCacheTimeToLiveMs";
     public static final String MAX_SERVER_CACHE_PERSISTENCE_TIME_TO_LIVE_MS_ATTRIB = "phoenix.coprocessor.maxServerCachePersistenceTimeToLiveMs";
-    
+
     @Deprecated // Use FORCE_ROW_KEY_ORDER instead.
     public static final String ROW_KEY_ORDER_SALTED_TABLE_ATTRIB  = "phoenix.query.rowKeyOrderSaltedTable";
-    
+
     public static final String USE_INDEXES_ATTRIB  = "phoenix.query.useIndexes";
     @Deprecated // use the IMMUTABLE keyword while creating the table
     public static final String IMMUTABLE_ROWS_ATTRIB  = "phoenix.mutate.immutableRows";
@@ -162,7 +162,7 @@ public interface QueryServices extends SQLCloseable {
         "phoenix.index.failure.handling.rebuild.interval";
     public static final String INDEX_REBUILD_TASK_INITIAL_DELAY = "phoenix.index.rebuild.task.initial.delay";
     public static final String START_TRUNCATE_TASK_DELAY = "phoenix.start.truncate.task.delay";
-    
+
     public static final String INDEX_FAILURE_HANDLING_REBUILD_NUMBER_OF_BATCHES_PER_TABLE = "phoenix.index.rebuild.batch.perTable";
     // If index disable timestamp is older than this threshold, then index rebuild task won't attempt to rebuild it
     public static final String INDEX_REBUILD_DISABLE_TIMESTAMP_THRESHOLD = "phoenix.index.rebuild.disabletimestamp.threshold";
@@ -216,7 +216,7 @@ public interface QueryServices extends SQLCloseable {
     public static final String STATS_GUIDEPOST_WIDTH_BYTES_ATTRIB = "phoenix.stats.guidepost.width";
     public static final String STATS_GUIDEPOST_PER_REGION_ATTRIB = "phoenix.stats.guidepost.per.region";
     public static final String STATS_USE_CURRENT_TIME_ATTRIB = "phoenix.stats.useCurrentTime";
-    
+
     public static final String RUN_UPDATE_STATS_ASYNC = "phoenix.update.stats.command.async";
     public static final String STATS_SERVER_POOL_SIZE = "phoenix.stats.pool.size";
     public static final String COMMIT_STATS_ASYNC = "phoenix.stats.commit.async";
@@ -245,7 +245,7 @@ public interface QueryServices extends SQLCloseable {
 
     // Tag Name to determine the Phoenix Client Type
     public static final String CLIENT_METRICS_TAG = "phoenix.client.metrics.tag";
-    
+
     // Transaction related configs
     public static final String TRANSACTIONS_ENABLED = "phoenix.transactions.enabled";
     // Controls whether or not uncommitted data is automatically sent to HBase
@@ -264,7 +264,7 @@ public interface QueryServices extends SQLCloseable {
     public static final String ALLOW_VIEWS_ADD_NEW_CF_BASE_TABLE = "phoenix.view.allowNewColumnFamily";
     public static final String RETURN_SEQUENCE_VALUES_ATTRIB = "phoenix.sequence.returnValues";
     public static final String EXTRA_JDBC_ARGUMENTS_ATTRIB = "phoenix.jdbc.extra.arguments";
-    
+
     public static final String MAX_VERSIONS_TRANSACTIONAL_ATTRIB = "phoenix.transactions.maxVersions";
 
     // metadata configs
@@ -282,7 +282,7 @@ public interface QueryServices extends SQLCloseable {
     public static final String INDEX_POPULATION_SLEEP_TIME = "phoenix.index.population.wait.time";
     public static final String LOCAL_INDEX_CLIENT_UPGRADE_ATTRIB = "phoenix.client.localIndexUpgrade";
     public static final String LIMITED_QUERY_SERIAL_THRESHOLD = "phoenix.limited.query.serial.threshold";
-    
+
     //currently BASE64 and ASCII is supported
     public static final String UPLOAD_BINARY_DATA_TYPE_ENCODING = "phoenix.upload.binaryDataType.encoding";
     // Toggle for server-written updates to SYSTEM.CATALOG
@@ -387,6 +387,13 @@ public interface QueryServices extends SQLCloseable {
     public static final String PHOENIX_VIEW_TTL_TENANT_VIEWS_PER_SCAN_LIMIT = "phoenix.view.ttl.tenant_views_per_scan.limit";
     // Block mutations based on cluster role record
     public static final String CLUSTER_ROLE_BASED_MUTATION_BLOCK_ENABLED = "phoenix.cluster.role.based.mutation.block.enabled";
+
+    // TODO: Revisit this default value based on production usage patterns
+    // Refresh interval for store and forward mode status updates in milliseconds
+    public static final String HA_STORE_AND_FORWARD_MODE_REFRESH_INTERVAL_MS = "phoenix.ha.store.forward.mode.refresh.interval.ms";
+    // TODO: Revisit this default value based on production usage patterns
+    // Refresh interval for sync mode status updates in milliseconds
+    public static final String HA_SYNC_MODE_REFRESH_INTERVAL_MS = "phoenix.ha.sync.mode.refresh.interval.ms";
     //Enable Thread Pool Creation in CQSI to be used for HBase Client.
     String CQSI_THREAD_POOL_ENABLED = "phoenix.cqsi.thread.pool.enabled";
     //CQSI Thread Pool Related Configuration.
@@ -405,7 +412,7 @@ public interface QueryServices extends SQLCloseable {
     // Also, before 4.15 when we added a column to a base table we would have to propagate the
     // column metadata to all its child views. After PHOENIX-3534 we no longer propagate metadata
     // changes from a parent to its children (we just resolve its ancestors and include their columns)
-    // 
+    //
     // The following config is used to continue writing the parent table column metadata while
     // creating a view and also prevent metadata changes to a parent table/view that needs to be
     // propagated to its children. This is done to allow rollback of the splittable SYSTEM.CATALOG

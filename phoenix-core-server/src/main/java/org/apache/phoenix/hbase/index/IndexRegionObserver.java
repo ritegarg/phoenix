@@ -84,6 +84,7 @@ import org.apache.phoenix.index.IndexMaintainer;
 import org.apache.phoenix.index.PhoenixIndexBuilderHelper;
 import org.apache.phoenix.index.PhoenixIndexMetaData;
 import org.apache.phoenix.jdbc.HAGroupStoreManager;
+import org.apache.phoenix.jdbc.HAGroupStoreManagerFactory;
 import org.apache.phoenix.query.KeyRange;
 import org.apache.phoenix.query.QueryConstants;
 import org.apache.phoenix.query.QueryServicesOptions;
@@ -543,8 +544,11 @@ public class IndexRegionObserver implements RegionCoprocessor, RegionObserver {
       }
       try {
           final Configuration conf = c.getEnvironment().getConfiguration();
-          final HAGroupStoreManager haGroupStoreManager = HAGroupStoreManager.getInstance(conf);
-          if (haGroupStoreManager.isMutationBlocked()) {
+          final Optional<HAGroupStoreManager> haGroupStoreManagerOptional = HAGroupStoreManagerFactory.getInstance(conf);
+          if (!haGroupStoreManagerOptional.isPresent()) {
+                throw new IOException("HAGroupStoreManager is null for current cluster, check configuration");
+          }
+          if (haGroupStoreManagerOptional.get().isMutationBlocked()) {
               throw new MutationBlockedIOException("Blocking Mutation as some CRRs "
                       + "are in ACTIVE_TO_STANDBY state and "
                       + "CLUSTER_ROLE_BASED_MUTATION_BLOCK_ENABLED is true");
@@ -1945,16 +1949,6 @@ public class IndexRegionObserver implements RegionCoprocessor, RegionObserver {
           }
           return mutations;
       }
-
-        boolean isUpdateOnly = atomicPut.getAttribute(
-                PhoenixIndexBuilderHelper.ATOMIC_OP_UPDATE_ONLY_ATTRIB) != null;
-        if (isUpdateOnly && currentDataRowState == null) {
-            // UPDATE_ONLY: If row doesn't exist, do nothing
-            if (context.returnResult) {
-                context.currColumnCellExprMap = currColumnCellExprMap;
-            }
-            return Collections.emptyList();
-        }
 
       ByteArrayInputStream stream = new ByteArrayInputStream(opBytes);
       DataInputStream input = new DataInputStream(stream);

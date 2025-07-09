@@ -24,10 +24,11 @@ import static org.apache.phoenix.query.QueryServices.ALLOW_VIEWS_ADD_NEW_CF_BASE
 import static org.apache.phoenix.query.QueryServices.AUTO_UPGRADE_ENABLED;
 import static org.apache.phoenix.query.QueryServices.CALL_QUEUE_PRODUCER_ATTRIB_NAME;
 import static org.apache.phoenix.query.QueryServices.CALL_QUEUE_ROUND_ROBIN_ATTRIB;
-import static org.apache.phoenix.query.QueryServices.CDC_TTL_MUTATION_MAX_RETRIES;
 import static org.apache.phoenix.query.QueryServices.CLIENT_METRICS_TAG;
 import static org.apache.phoenix.query.QueryServices.CLIENT_SPOOL_THRESHOLD_BYTES_ATTRIB;
 import static org.apache.phoenix.query.QueryServices.CLUSTER_ROLE_BASED_MUTATION_BLOCK_ENABLED;
+import static org.apache.phoenix.query.QueryServices.HA_STORE_AND_FORWARD_MODE_REFRESH_INTERVAL_MS;
+import static org.apache.phoenix.query.QueryServices.HA_SYNC_MODE_REFRESH_INTERVAL_MS;
 import static org.apache.phoenix.query.QueryServices.COLLECT_REQUEST_LEVEL_METRICS;
 import static org.apache.phoenix.query.QueryServices.COMMIT_STATS_ASYNC;
 import static org.apache.phoenix.query.QueryServices.CONNECTION_ACTIVITY_LOGGING_ENABLED;
@@ -226,7 +227,7 @@ public class QueryServicesOptions {
     public static final int DEFAULT_GROUPBY_ESTIMATED_DISTINCT_VALUES = 1000;
     public static final int DEFAULT_CLOCK_SKEW_INTERVAL = 2000;
     public static final boolean DEFAULT_INDEX_FAILURE_HANDLING_REBUILD = true; // auto rebuild on
-    public static final boolean DEFAULT_INDEX_FAILURE_BLOCK_WRITE = false; 
+    public static final boolean DEFAULT_INDEX_FAILURE_BLOCK_WRITE = false;
     public static final boolean DEFAULT_INDEX_FAILURE_DISABLE_INDEX = true;
     public static final boolean DEFAULT_INDEX_FAILURE_THROW_EXCEPTION = true;
     public static final long DEFAULT_INDEX_FAILURE_HANDLING_REBUILD_INTERVAL = 60000; // 60 secs
@@ -376,7 +377,7 @@ public class QueryServicesOptions {
     public static final int DEFAULT_CONNECTION_ACTIVITY_LOGGING_INTERVAL_IN_MINS = 15;
     public static final boolean DEFAULT_STATS_COLLECTION_ENABLED = true;
     public static final boolean DEFAULT_USE_STATS_FOR_PARALLELIZATION = true;
-    
+
     //Security defaults
     public static final boolean DEFAULT_PHOENIX_ACLS_ENABLED = false;
 
@@ -463,16 +464,22 @@ public class QueryServicesOptions {
 
 
     public static final Boolean DEFAULT_CLUSTER_ROLE_BASED_MUTATION_BLOCK_ENABLED = false;
+
+    // TODO: Revisit these default values based on production usage patterns
+    public static final long DEFAULT_HA_STORE_AND_FORWARD_MODE_REFRESH_INTERVAL_MS = 1000L; // 2.5 seconds
+    public static final long DEFAULT_HA_SYNC_MODE_REFRESH_INTERVAL_MS = 3000L; // 5 seconds
+
     public static final Boolean DEFAULT_CQSI_THREAD_POOL_ENABLED = false;
+    public static final int DEFAULT_CDC_TTL_MUTATION_MAX_RETRIES = 5;
+
+    public static final long DEFAULT_PHOENIX_CDC_STREAM_PARTITION_EXPIRY_MIN_AGE_MS = 30*60*60*1000; // 30 hours
     public static final int DEFAULT_CQSI_THREAD_POOL_KEEP_ALIVE_SECONDS = 60;
     public static final int DEFAULT_CQSI_THREAD_POOL_CORE_POOL_SIZE = 25;
     public static final int DEFAULT_CQSI_THREAD_POOL_MAX_THREADS = 25;
     public static final int DEFAULT_CQSI_THREAD_POOL_MAX_QUEUE = 512;
     public static final Boolean DEFAULT_CQSI_THREAD_POOL_ALLOW_CORE_THREAD_TIMEOUT = true;
     public static final Boolean DEFAULT_CQSI_THREAD_POOL_METRICS_ENABLED = false;
-    public static final int DEFAULT_CDC_TTL_MUTATION_MAX_RETRIES = 5;
-  
-    public static final long DEFAULT_PHOENIX_CDC_STREAM_PARTITION_EXPIRY_MIN_AGE_MS = 30*60*60*1000; // 30 hours
+
 
     private final Configuration config;
 
@@ -580,6 +587,10 @@ public class QueryServicesOptions {
                     DEFAULT_CONNECTION_ACTIVITY_LOGGING_INTERVAL_IN_MINS)
             .setIfUnset(CLUSTER_ROLE_BASED_MUTATION_BLOCK_ENABLED,
                     DEFAULT_CLUSTER_ROLE_BASED_MUTATION_BLOCK_ENABLED)
+            .setIfUnset(HA_STORE_AND_FORWARD_MODE_REFRESH_INTERVAL_MS,
+                    DEFAULT_HA_STORE_AND_FORWARD_MODE_REFRESH_INTERVAL_MS)
+            .setIfUnset(HA_SYNC_MODE_REFRESH_INTERVAL_MS,
+                    DEFAULT_HA_SYNC_MODE_REFRESH_INTERVAL_MS)
             .setIfUnset(CQSI_THREAD_POOL_ENABLED, DEFAULT_CQSI_THREAD_POOL_ENABLED)
             .setIfUnset(CQSI_THREAD_POOL_KEEP_ALIVE_SECONDS,
                     DEFAULT_CQSI_THREAD_POOL_KEEP_ALIVE_SECONDS)
@@ -588,8 +599,7 @@ public class QueryServicesOptions {
             .setIfUnset(CQSI_THREAD_POOL_MAX_QUEUE, DEFAULT_CQSI_THREAD_POOL_MAX_QUEUE)
             .setIfUnset(CQSI_THREAD_POOL_ALLOW_CORE_THREAD_TIMEOUT,
                     DEFAULT_CQSI_THREAD_POOL_ALLOW_CORE_THREAD_TIMEOUT)
-            .setIfUnset(CQSI_THREAD_POOL_METRICS_ENABLED, DEFAULT_CQSI_THREAD_POOL_METRICS_ENABLED)
-            .setIfUnset(CDC_TTL_MUTATION_MAX_RETRIES, DEFAULT_CDC_TTL_MUTATION_MAX_RETRIES);
+            .setIfUnset(CQSI_THREAD_POOL_METRICS_ENABLED, DEFAULT_CQSI_THREAD_POOL_METRICS_ENABLED);
 
         // HBase sets this to 1, so we reset it to something more appropriate.
         // Hopefully HBase will change this, because we can't know if a user set

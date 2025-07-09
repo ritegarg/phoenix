@@ -3809,18 +3809,18 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
     protected long getSystemTableVersion() {
         return MetaDataProtocol.MIN_SYSTEM_TABLE_TIMESTAMP;
     }
-    
+
 
     // Available for testing
     protected void setUpgradeRequired() {
         this.upgradeRequired.set(true);
     }
-    
+
     // Available for testing
     protected boolean isInitialized() {
         return initialized;
     }
-    
+
     // Available for testing
     protected void setInitialized(boolean isInitialized) {
         initialized = isInitialized;
@@ -5171,7 +5171,7 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
     }
 
 
-    // Special method for adding the column qualifier column for 4.10. 
+    // Special method for adding the column qualifier column for 4.10.
     private PhoenixConnection addColumnQualifierColumn(PhoenixConnection oldMetaConnection, Long timestamp) throws SQLException {
         Properties props = PropertiesUtil.deepCopy(oldMetaConnection.getClientInfo());
         props.setProperty(PhoenixRuntime.CURRENT_SCN_ATTRIB, Long.toString(timestamp));
@@ -6267,7 +6267,7 @@ public class ConnectionQueryServicesImpl extends DelegateQueryServices implement
     public String getUserName() {
         return userName;
     }
-    
+
     @Override
     public User getUser() {
         return user;
