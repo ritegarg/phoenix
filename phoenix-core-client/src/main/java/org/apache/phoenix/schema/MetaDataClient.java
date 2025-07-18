@@ -49,6 +49,7 @@ import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.ASYNC_REBUILD_TIME
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.AUTO_PARTITION_SEQ;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.BASE_COLUMN_COUNT;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.CHANGE_DETECTION_ENABLED;
+import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.IS_STRICT_TTL;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.CLASS_NAME;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.COLUMN_COUNT;
 import static org.apache.phoenix.jdbc.PhoenixDatabaseMetaData.COLUMN_DEF;
@@ -380,9 +381,10 @@ public class MetaDataClient {
                     INDEX_WHERE + "," +
                     CDC_INCLUDE_TABLE + "," +
                     TTL + "," +
-                    ROW_KEY_MATCHER +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-                "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    ROW_KEY_MATCHER + ","
+                    + IS_STRICT_TTL
+                    + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+                    + "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String CREATE_SCHEMA = "UPSERT INTO " + SYSTEM_CATALOG_SCHEMA + ".\"" + SYSTEM_CATALOG_TABLE
             + "\"( " + TABLE_SCHEM + "," + TABLE_NAME + ") VALUES (?,?)";
@@ -2582,6 +2584,16 @@ public class MetaDataClient {
                 (Boolean) TableProperty.CHANGE_DETECTION_ENABLED.getValue(tableProps);
             verifyChangeDetectionTableType(tableType, isChangeDetectionEnabledProp);
 
+            boolean isStrictTTL;
+            Boolean isStrictTTLProp =
+                    (Boolean) TableProperty.IS_STRICT_TTL.getValue(tableProps);
+            if (tableType == PTableType.INDEX && parent != null) {
+                isStrictTTL = parent.isStrictTTL();
+            } else {
+                isStrictTTL =
+                        isStrictTTLProp != null ? isStrictTTLProp : PTable.DEFAULT_IS_STRICT_TTL;
+            }
+
             String schemaVersion = (String) TableProperty.SCHEMA_VERSION.getValue(tableProps);
             String streamingTopicName = (String) TableProperty.STREAMING_TOPIC_NAME.getValue(tableProps);
 
@@ -3676,6 +3688,8 @@ public class MetaDataClient {
                 tableUpsert.setBytes(37, rowKeyMatcher);
             }
 
+            tableUpsert.setBoolean(38, isStrictTTL);
+
             tableUpsert.execute();
 
             if (asyncCreatedDate != null) {
@@ -3816,6 +3830,7 @@ public class MetaDataClient {
                         .setLastDDLTimestamp(result.getTable() != null ?
                                 result.getTable().getLastDDLTimestamp() : null)
                         .setIsChangeDetectionEnabled(isChangeDetectionEnabledProp)
+                        .setIsStrictTTL(isStrictTTL)
                         .setSchemaVersion(schemaVersion)
                         .setExternalSchemaId(result.getTable() != null ?
                         result.getTable().getExternalSchemaId() : null)
@@ -4237,6 +4252,7 @@ public class MetaDataClient {
                                         .setImmutableStorageScheme(table.getImmutableStorageScheme())
                                         .setQualifierEncodingScheme(table.getEncodingScheme())
                                         .setUseStatsForParallelization(table.useStatsForParallelization())
+                                        .setIsStrictTTL(table.isStrictTTL())
                                         .build();
                                 tableRefs.add(new TableRef(null, viewIndexTable, ts, false));
                             }
@@ -4334,6 +4350,7 @@ public class MetaDataClient {
                 metaPropertiesEvaluated.getUseStatsForParallelization(),
                 metaPropertiesEvaluated.getTTL(),
                 metaPropertiesEvaluated.isChangeDetectionEnabled(),
+                metaPropertiesEvaluated.isStrictTTL(),
                 metaPropertiesEvaluated.getPhysicalTableName(),
                 metaPropertiesEvaluated.getSchemaVersion(),
                 metaPropertiesEvaluated.getColumnEncodedBytes(),
@@ -4344,8 +4361,8 @@ public class MetaDataClient {
                                        Long updateCacheFrequency, String physicalTableName,
                                        String schemaVersion, QualifierEncodingScheme columnEncodedBytes) throws SQLException {
         return incrementTableSeqNum(table, expectedType, columnCountDelta, isTransactional, null,
-            updateCacheFrequency, null, null, null, null, -1L, null, null, null,null, false, physicalTableName,
-                schemaVersion, columnEncodedBytes, null);
+                updateCacheFrequency, null, null, null, null, -1L, null, null, null, null, false,
+                null, physicalTableName, schemaVersion, columnEncodedBytes, null);
     }
 
     private long incrementTableSeqNum(PTable table, PTableType expectedType, int columnCountDelta,
@@ -4353,7 +4370,8 @@ public class MetaDataClient {
             Long updateCacheFrequency, Boolean isImmutableRows, Boolean disableWAL,
             Boolean isMultiTenant, Boolean storeNulls, Long guidePostWidth, Boolean appendOnlySchema,
             ImmutableStorageScheme immutableStorageScheme, Boolean useStatsForParallelization,
-            TTLExpression ttl, Boolean isChangeDetectionEnabled, String physicalTableName,
+            TTLExpression ttl, Boolean isChangeDetectionEnabled, Boolean isStrictTTL,
+            String physicalTableName,
             String schemaVersion, QualifierEncodingScheme columnEncodedBytes,
             String streamingTopicName)
             throws SQLException {
@@ -4417,6 +4435,10 @@ public class MetaDataClient {
         }
         if (isChangeDetectionEnabled != null) {
             mutateBooleanProperty(connection, tenantId, schemaName, tableName, CHANGE_DETECTION_ENABLED, isChangeDetectionEnabled);
+        }
+        if (isStrictTTL != null) {
+            mutateBooleanProperty(connection, tenantId, schemaName, tableName, IS_STRICT_TTL,
+                    isStrictTTL);
         }
         if (!Strings.isNullOrEmpty(physicalTableName)) {
             mutateStringProperty(connection, tenantId, schemaName, tableName, PHYSICAL_TABLE_NAME, physicalTableName);
@@ -5060,6 +5082,7 @@ public class MetaDataClient {
                                     .setImmutableStorageScheme(table.getImmutableStorageScheme())
                                     .setQualifierEncodingScheme(table.getEncodingScheme())
                                     .setUseStatsForParallelization(table.useStatsForParallelization())
+                                    .setIsStrictTTL(table.isStrictTTL())
                                     .build();
                             List<TableRef> tableRefs = Collections.singletonList(new TableRef(null, viewIndexTable, ts, false));
                             MutationPlan plan = new PostDDLCompiler(connection).compile(tableRefs, null, null,
@@ -5515,6 +5538,7 @@ public class MetaDataClient {
                                                 QualifierEncodingScheme.NON_ENCODED_QUALIFIERS : qualifierEncodingScheme)
                                         .setEncodedCQCounter(table.getEncodedCQCounter())
                                         .setUseStatsForParallelization(table.useStatsForParallelization())
+                                        .setIsStrictTTL(table.isStrictTTL())
                                         .setExcludedColumns(ImmutableList.<PColumn>of())
                                         .setTenantId(sharedTableState.getTenantId())
                                         .setSchemaName(sharedTableState.getSchemaName())
@@ -6041,6 +6065,8 @@ public class MetaDataClient {
                         metaProperties.setSchemaVersion((String) value);
                     } else if (propName.equalsIgnoreCase(STREAMING_TOPIC_NAME)) {
                         metaProperties.setStreamingTopicName((String) value);
+                    } else if (propName.equalsIgnoreCase(IS_STRICT_TTL)) {
+                        metaProperties.setStrictTTL((Boolean) value);
                     }
                 }
                 // if removeTableProps is true only add the property if it is not an HTable or Phoenix Table property
@@ -6274,6 +6300,13 @@ public class MetaDataClient {
             }
         }
 
+        if (metaProperties.isStrictTTL() != null) {
+            if (!metaProperties.isStrictTTL().equals(table.isStrictTTL())) {
+                metaPropertiesEvaluated.setStrictTTL(metaProperties.isStrictTTL());
+                changingPhoenixTableProperty = true;
+            }
+        }
+
         return changingPhoenixTableProperty;
     }
 
@@ -6294,6 +6327,7 @@ public class MetaDataClient {
         private boolean nonTxToTx = false;
         private TTLExpression ttl = null;
         private Boolean isChangeDetectionEnabled = null;
+        private Boolean isStrictTTL = null;
         private String physicalTableName = null;
         private String schemaVersion = null;
         private String streamingTopicName = null;
@@ -6449,6 +6483,14 @@ public class MetaDataClient {
         public void setStreamingTopicName(String streamingTopicName) {
             this.streamingTopicName = streamingTopicName;
         }
+
+        public Boolean isStrictTTL() {
+            return isStrictTTL;
+        }
+
+        public void setStrictTTL(Boolean isStrictTTL) {
+            this.isStrictTTL = isStrictTTL;
+        }
     }
 
     private static class MetaPropertiesEvaluated {
@@ -6466,6 +6508,7 @@ public class MetaDataClient {
         private TransactionFactory.Provider transactionProvider = null;
         private TTLExpression ttl = null;
         private Boolean isChangeDetectionEnabled = null;
+        private Boolean isStrictTTL = null;
         private String physicalTableName = null;
         private String schemaVersion = null;
         private String streamingTopicName = null;
@@ -6597,6 +6640,14 @@ public class MetaDataClient {
 
         public void setStreamingTopicName(String streamingTopicName) {
             this.streamingTopicName = streamingTopicName;
+        }
+
+        public Boolean isStrictTTL() {
+            return isStrictTTL;
+        }
+
+        public void setStrictTTL(Boolean isStrictTTL) {
+            this.isStrictTTL = isStrictTTL;
         }
     }
 
