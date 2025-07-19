@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,15 +19,11 @@ package org.apache.phoenix.coprocessor;
 
 import java.io.IOException;
 import java.util.Collections;
-
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorException;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hbase.thirdparty.com.google.protobuf.RpcCallback;
-import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
-import org.apache.hbase.thirdparty.com.google.protobuf.Service;
 import org.apache.phoenix.cache.GlobalCache;
 import org.apache.phoenix.cache.TenantCache;
 import org.apache.phoenix.coprocessor.generated.ServerCachingProtos.AddServerCacheRequest;
@@ -42,57 +38,59 @@ import org.apache.phoenix.util.ByteUtil;
 import org.apache.phoenix.util.ClientUtil;
 import org.apache.phoenix.util.ScanUtil;
 
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcCallback;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.Service;
+
 /**
- * 
  * Server-side implementation of {@link ServerCachingProtocol}
- *
- * 
  * @since 0.1
  */
-public class ServerCachingEndpointImpl extends ServerCachingService implements RegionCoprocessor 
-     {
+public class ServerCachingEndpointImpl extends ServerCachingService implements RegionCoprocessor {
 
   private RegionCoprocessorEnvironment env;
-  
+
   @Override
   public Iterable<Service> getServices() {
-      return Collections.singleton(this);
+    return Collections.singleton(this);
   }
 
   @Override
   public void addServerCache(RpcController controller, AddServerCacheRequest request,
-          RpcCallback<AddServerCacheResponse> done) {
-      ImmutableBytesPtr tenantId = null;
-      if (request.hasTenantId()) {
-          tenantId = new ImmutableBytesPtr(request.getTenantId().toByteArray());
-      }
-      TenantCache tenantCache = GlobalCache.getTenantCache(this.env, tenantId);
-      ImmutableBytesWritable cachePtr =
-              org.apache.phoenix.protobuf.ProtobufUtil
-              .toImmutableBytesWritable(request.getCachePtr());
-      byte[] txState = request.hasTxState() ? request.getTxState().toByteArray() : ByteUtil.EMPTY_BYTE_ARRAY;
+    RpcCallback<AddServerCacheResponse> done) {
+    ImmutableBytesPtr tenantId = null;
+    if (request.hasTenantId()) {
+      tenantId = new ImmutableBytesPtr(request.getTenantId().toByteArray());
+    }
+    TenantCache tenantCache = GlobalCache.getTenantCache(this.env, tenantId);
+    ImmutableBytesWritable cachePtr =
+      org.apache.phoenix.protobuf.ProtobufUtil.toImmutableBytesWritable(request.getCachePtr());
+    byte[] txState =
+      request.hasTxState() ? request.getTxState().toByteArray() : ByteUtil.EMPTY_BYTE_ARRAY;
 
-      try {
-          @SuppressWarnings("unchecked")
-          Class<ServerCacheFactory> serverCacheFactoryClass =
-          (Class<ServerCacheFactory>) Class.forName(request.getCacheFactory().getClassName());
-          ServerCacheFactory cacheFactory = serverCacheFactoryClass.newInstance();
-          tenantCache.addServerCache(new ImmutableBytesPtr(request.getCacheId().toByteArray()),
-              cachePtr, txState, cacheFactory, request.hasHasProtoBufIndexMaintainer() && request.getHasProtoBufIndexMaintainer(),
-              request.getUsePersistentCache(), request.hasClientVersion() ? request.getClientVersion() : ScanUtil.UNKNOWN_CLIENT_VERSION);
-        } catch (Throwable e) {
-            ProtobufUtil.setControllerException(controller,
-                ClientUtil.createIOException("Error when adding cache: ", e));
-        }
-      AddServerCacheResponse.Builder responseBuilder = AddServerCacheResponse.newBuilder();
-      responseBuilder.setReturn(true);
-      AddServerCacheResponse result = responseBuilder.build();
-      done.run(result);
+    try {
+      @SuppressWarnings("unchecked")
+      Class<ServerCacheFactory> serverCacheFactoryClass =
+        (Class<ServerCacheFactory>) Class.forName(request.getCacheFactory().getClassName());
+      ServerCacheFactory cacheFactory = serverCacheFactoryClass.newInstance();
+      tenantCache.addServerCache(new ImmutableBytesPtr(request.getCacheId().toByteArray()),
+        cachePtr, txState, cacheFactory,
+        request.hasHasProtoBufIndexMaintainer() && request.getHasProtoBufIndexMaintainer(),
+        request.getUsePersistentCache(),
+        request.hasClientVersion() ? request.getClientVersion() : ScanUtil.UNKNOWN_CLIENT_VERSION);
+    } catch (Throwable e) {
+      ProtobufUtil.setControllerException(controller,
+        ClientUtil.createIOException("Error when adding cache: ", e));
+    }
+    AddServerCacheResponse.Builder responseBuilder = AddServerCacheResponse.newBuilder();
+    responseBuilder.setReturn(true);
+    AddServerCacheResponse result = responseBuilder.build();
+    done.run(result);
   }
 
   @Override
   public void removeServerCache(RpcController controller, RemoveServerCacheRequest request,
-      RpcCallback<RemoveServerCacheResponse> done) {
+    RpcCallback<RemoveServerCacheResponse> done) {
     ImmutableBytesPtr tenantId = null;
     if (request.hasTenantId()) {
       tenantId = new ImmutableBytesPtr(request.getTenantId().toByteArray());
