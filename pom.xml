@@ -99,7 +99,7 @@
     <!-- com.google repo will be used except on Aarch64 platform. -->
     <protobuf.group>com.google.protobuf</protobuf.group>
     <protoc.version>${hbase.protobuf.version}</protoc.version>
-    <commons-lang3.version>3.17.0</commons-lang3.version>
+    <commons-lang3.version>3.18.0</commons-lang3.version>
     <commons-io.version>2.18.0</commons-io.version>
     <commons-csv.version>1.0</commons-csv.version>
     <commons-compress.version>1.26.0</commons-compress.version>
