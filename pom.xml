@@ -89,7 +89,8 @@
     <shadeSources>true</shadeSources>
 
     <!-- Dependency versions -->
-    <netty-bom.version>4.1.126.Final</netty-bom.version>
+    <!-- Use the netty4 version from the BPP -->
+    <netty-bom.version>${netty4.version}</netty-bom.version>
     <antlr.version>3.5.2</antlr.version>
     <!-- Only used for tests with HBase 2.1-2.4 -->
     <!-- <reload4j.version>1.2.19</reload4j.version> -->
@@ -114,7 +115,7 @@
     <stream.version>2.9.5</stream.version>
     <icu4j.version>72.1</icu4j.version>
     <guice.version>5.1.0</guice.version>
-    <commons.beanutils.version>1.9.4</commons.beanutils.version>
+    <commons.beanutils.version>1.11.0</commons.beanutils.version>
     <zookeeper.version>${zookeeper.main}</zookeeper.version>
     <curator.version>4.2.0</curator.version>
     <jcodings.version>1.0.55</jcodings.version>
