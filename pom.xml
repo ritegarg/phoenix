@@ -117,7 +117,6 @@
     <guice.version>5.1.0</guice.version>
     <commons.beanutils.version>1.11.0</commons.beanutils.version>
     <zookeeper.version>${zookeeper.main}</zookeeper.version>
-    <curator.version>4.2.0</curator.version>
     <jcodings.version>1.0.55</jcodings.version>
     <jetty.version>9.4.58.v20250814</jetty.version>
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
