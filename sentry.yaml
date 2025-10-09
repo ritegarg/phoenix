@@ -1,0 +1,7 @@
+# This is automatically generated and managed by Bigdata-CI.
+# Manual changes are not expected in this file.
+- source_branch: 5.3.0-sfdc-14
+  ci_branch: master
+  stack_boms:
+  - phoenix-5.3
+  merge_method: squash

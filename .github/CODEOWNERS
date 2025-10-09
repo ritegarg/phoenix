@@ -1,0 +1,3 @@
+# Add any new entries above this line
+sentry.yaml @bigdata-packaging/bigdata-productivity
+.github/CODEOWNERS @bigdata-packaging/bigdata-productivity
