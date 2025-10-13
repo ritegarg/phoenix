@@ -141,7 +141,7 @@
     <maven-antlr-eclipse-plugin.version>${antlr.version}</maven-antlr-eclipse-plugin.version>
     <spotbugs-maven-plugin.version>4.8.1.0</spotbugs-maven-plugin.version>
     <spotbugs.version>4.8.1</spotbugs.version>
-    <jacoco-maven-plugin.version>0.8.11</jacoco-maven-plugin.version>
+    <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
     <sonar-maven-plugin.version>3.10.0.2594</sonar-maven-plugin.version>
     <findbugs-annotations.version>1.3.9-1</findbugs-annotations.version>
     <maven-owasp-plugin.version>12.1.0</maven-owasp-plugin.version>
@@ -164,8 +164,8 @@
     <skipParallelStatsEnabledTests>false</skipParallelStatsEnabledTests>
     <skipParallelStatsDisabledTests>false</skipParallelStatsDisabledTests>
     <skipNeedsOwnMiniClusterTests>false</skipNeedsOwnMiniClusterTests>
-    <numForkedUT>8</numForkedUT>
-    <numForkedIT>7</numForkedIT>
+    <numForkedUT>15</numForkedUT>
+    <numForkedIT>15</numForkedIT>
     <it.failIfNoSpecifiedTests>false</it.failIfNoSpecifiedTests>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <!-- Empty argument when code coverage is deactivated -->
@@ -224,6 +224,7 @@
     <!--- We define hbase.protobuf.version in the BPP -->
     <protobuf.version>${hbase.protobuf.version}</protobuf.version>
     <os.maven.version>1.5.0.Final</os.maven.version>
+    <surefire.excludesFile>${session.topLevelProject.basedir}/surefireExcludes.txt</surefire.excludesFile>
   </properties>
 
   <dependencyManagement>

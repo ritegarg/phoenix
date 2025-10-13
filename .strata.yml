@@ -6,5 +6,9 @@ global:
     - 5.2-sfdc-13
 stages:
   integration-test:
-    - maven-verify:
-        maven-publish-jar-args: -Dmaven.test.failure.ignore=true -Dsurefire.testFailureIgnore=true -Drat.skip=true
+    - step:
+        name: mvn-verify
+        image: docker.repo.local.sfdc.net/sfci/docker-images/sfdc_centos7_jdk8
+        commands:
+          - mvn -Pcodecoverage verify -Dmaven.test.failure.ignore=true -Dsurefire.testFailureIgnore=true
+          - mvn jacoco:report-aggregate
