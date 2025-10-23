@@ -28,11 +28,14 @@ import org.apache.phoenix.util.ReadOnlyProps;
 public class ITGuidePostsCacheFactory implements GuidePostsCacheFactory {
   public static final ConcurrentHashMap<Integer, DefaultGuidePostsCacheFactory> map =
     new ConcurrentHashMap<>();
+  // incremented when this class is instantiated which is once per cqsi
+  private static AtomicInteger created = new AtomicInteger();
+  // incremented when this class is actually used as cache factory
   private static AtomicInteger count = new AtomicInteger();
   private Integer key;
 
   public ITGuidePostsCacheFactory() {
-    key = count.getAndIncrement();
+    key = created.getAndIncrement();
     map.put(key, new DefaultGuidePostsCacheFactory());
   }
 
@@ -53,6 +56,7 @@ public class ITGuidePostsCacheFactory implements GuidePostsCacheFactory {
   @Override
   public GuidePostsCache getGuidePostsCache(PhoenixStatsLoader phoenixStatsLoader,
     Configuration config) {
+    count.getAndIncrement();
     return map.get(key).getGuidePostsCache(phoenixStatsLoader, config);
   }
 }
