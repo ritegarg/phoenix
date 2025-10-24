@@ -5,3 +5,4 @@ org.apache.phoenix.end2end.PermissionNSDisabledWithCustomAccessControllerIT
 org.apache.phoenix.end2end.PermissionNSEnabledIT
 org.apache.phoenix.end2end.PermissionNSEnabledWithCustomAccessControllerIT
 org.apache.phoenix.end2end.PermissionsCacheIT
+org.apache.phoenix.jdbc.HAConnectionWithMasterAndRPCRegistryIT
