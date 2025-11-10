@@ -9,5 +9,3 @@
 - suite: org.apache.hadoop.hbase.regionserver.wal.WALRecoveryRegionPostOpenIT
   is_permanent: true
 - suite: org.apache.phoenix.iterate.PhoenixQueryTimeoutIT
-  testcases:
-    - testScanningResultIteratorQueryTimeoutForPagingWithVeryLowTimeout
