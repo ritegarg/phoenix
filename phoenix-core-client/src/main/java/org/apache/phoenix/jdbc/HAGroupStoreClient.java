@@ -124,11 +124,15 @@ public class HAGroupStoreClient implements Closeable {
             case INITIALIZED:
               latch.countDown();
               break;
-            case CONNECTION_LOST:
             case CONNECTION_SUSPENDED:
+              LOGGER.warn("Received CONNECTION_SUSPENDED event, will wait until either "
+                      + "ZK connection is restored or session timeout occurs");
+              break;
+            case CONNECTION_LOST:
               isHealthy = false;
               break;
             case CONNECTION_RECONNECTED:
+              LOGGER.info("Received CONNECTION_RECONNECTED event, marking cache as healthy");
               isHealthy = true;
               break;
             default:
