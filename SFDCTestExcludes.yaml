@@ -8,4 +8,3 @@
 - suite: org.apache.phoenix.jdbc.ParallelPhoenixConnectionFailureTest
 - suite: org.apache.hadoop.hbase.regionserver.wal.WALRecoveryRegionPostOpenIT
   is_permanent: true
-- suite: org.apache.phoenix.iterate.PhoenixQueryTimeoutIT
