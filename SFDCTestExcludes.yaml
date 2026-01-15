@@ -8,3 +8,8 @@
 - suite: org.apache.phoenix.jdbc.ParallelPhoenixConnectionFailureTest
 - suite: org.apache.hadoop.hbase.regionserver.wal.WALRecoveryRegionPostOpenIT
   is_permanent: true
+- suite: org.apache.phoenix.end2end.PermissionNSEnabledWithCustomAccessControllerIT
+- suite: org.apache.phoenix.end2end.TableTTLIT
+- suite: org.apache.phoenix.end2end.UpsertSelectIT
+- suite: org.apache.phoenix.iterate.PhoenixQueryTimeoutIT
+- suite: org.apache.phoenix.query.MetaDataCacheMetricsIT
