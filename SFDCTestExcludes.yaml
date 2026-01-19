@@ -13,3 +13,39 @@
 - suite: org.apache.phoenix.end2end.UpsertSelectIT
 - suite: org.apache.phoenix.iterate.PhoenixQueryTimeoutIT
 - suite: org.apache.phoenix.query.MetaDataCacheMetricsIT
+- suite: org.apache.phoenix.end2end.ParameterizedIndexUpgradeToolIT
+- suite: org.apache.phoenix.end2end.index.IndexMetadataIT
+- suite: org.apache.phoenix.end2end.index.GlobalMutableTxIndexIT
+- suite: org.apache.phoenix.end2end.index.PartialIndexIT
+- suite: org.apache.phoenix.end2end.UpgradeIT
+- suite: org.apache.phoenix.end2end.index.GlobalIndexCheckerWithRegionMovesIT
+- suite: org.apache.phoenix.end2end.index.PartialIndexRebuilderIT
+- suite: org.apache.phoenix.monitoring.PhoenixTableLevelMetricsIT
+- suite: org.apache.phoenix.end2end.index.MutableIndexFailureWithNamespaceIT
+- suite: org.apache.phoenix.end2end.IndexToolForNonTxGlobalIndexIT
+- suite: org.apache.phoenix.end2end.AggregateWithRegionMovesIT
+  testcases:
+    - testAvgGroupByDescOrderPreservingWithStats
+- suite: org.apache.phoenix.end2end.LoadSystemTableSnapshotIT
+- suite: org.apache.phoenix.query.MaxConcurrentConnectionsIT
+- suite: org.apache.phoenix.end2end.LogicalTableNameIT
+- suite: org.apache.phoenix.end2end.MetadataGetTableReadLockIT
+- suite: org.apache.phoenix.jdbc.FailoverPhoenixConnection2IT
+- suite: org.apache.phoenix.end2end.ConcurrentMutationsIT
+- suite: org.apache.phoenix.end2end.TableSnapshotReadsMapReduceIT
+  testcases:
+    - testMapReduceSnapshotsMultiRegion
+- suite: org.apache.phoenix.jdbc.LoggingSingleConnectionLimiterIT
+  testcases:
+    - testActivityLogsOnQueryWhenFailures
+- suite: org.apache.phoenix.pherf.workload.mt.TenantViewOperationWorkloadIT
+- suite: org.apache.phoenix.jdbc.ParallelPhoenixConnectionTest
+- suite: org.apache.phoenix.end2end.TableSnapshotReadsMapReduceIT
+- suite: org.apache.phoenix.pherf.PherfMainIT
+- suite: org.apache.phoenix.end2end.index.ViewIndexIT
+- suite: org.apache.phoenix.end2end.ConcurrentMutationsExtendedIT
+- suite: org.apache.phoenix.end2end.ConcurrentMutationsLazyPostBatchWriteIT
+- suite: org.apache.phoenix.jdbc.HAConnectionWithMasterAndRPCRegistryIT
+  testcases:
+    - testAllWrappedConnectionsClosedAfterActiveURLChange
+    - testAllWrappedConnectionsNotClosedAfterStandbyURLChange

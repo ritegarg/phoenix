@@ -1741,7 +1741,8 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
+        <version>${surefire.version}</version>
+	<configuration>
           <forkCount>${numForkedUT}</forkCount>
           <reuseForks>true</reuseForks>
           <redirectTestOutputToFile>${test.output.tofile}</redirectTestOutputToFile>
