@@ -19,8 +19,8 @@ package org.apache.phoenix.end2end;
 
 import static org.junit.Assert.assertEquals;
 
-import com.google.protobuf.RpcCallback;
-import com.google.protobuf.RpcController;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcCallback;
+import org.apache.hbase.thirdparty.com.google.protobuf.RpcController;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
