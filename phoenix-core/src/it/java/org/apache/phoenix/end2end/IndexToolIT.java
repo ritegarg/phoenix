@@ -396,11 +396,11 @@ public class IndexToolIT extends BaseTest {
   protected static void dropIndexToolTables(Connection conn) throws Exception {
     Admin admin = conn.unwrap(PhoenixConnection.class).getQueryServices().getAdmin();
     TableName indexToolOutputTable =
-      TableName.valueOf(IndexVerificationOutputRepository.OUTPUT_TABLE_NAME_BYTES);
+      TableName.valueOf(IndexVerificationOutputRepository.getOutputTableNameBytes());
     admin.disableTable(indexToolOutputTable);
     admin.deleteTable(indexToolOutputTable);
     TableName indexToolResultTable =
-      TableName.valueOf(IndexVerificationResultRepository.RESULT_TABLE_NAME_BYTES);
+      TableName.valueOf(IndexVerificationResultRepository.getResultTableNameBytes());
     admin.disableTable(indexToolResultTable);
     admin.deleteTable(indexToolResultTable);
   }
@@ -445,7 +445,7 @@ public class IndexToolIT extends BaseTest {
     byte[] indexTableFullNameBytes = Bytes.toBytes(indexTableFullName);
     byte[] dataTableFullNameBytes = Bytes.toBytes(dataTableFullName);
     Table hIndexTable = conn.unwrap(PhoenixConnection.class).getQueryServices()
-      .getTable(IndexVerificationOutputRepository.OUTPUT_TABLE_NAME_BYTES);
+      .getTable(IndexVerificationOutputRepository.getOutputTableNameBytes());
     Scan scan = new Scan();
     ResultScanner scanner = hIndexTable.getScanner(scan);
     boolean dataTableNameCheck = false;
@@ -490,7 +490,7 @@ public class IndexToolIT extends BaseTest {
     assertTrue("Error message cell was null", errorMessageCell != null);
     verifyIndexTableRowKey(CellUtil.cloneRow(errorMessageCell), indexTableFullName);
     hIndexTable = conn.unwrap(PhoenixConnection.class).getQueryServices()
-      .getTable(IndexVerificationResultRepository.RESULT_TABLE_NAME_BYTES);
+      .getTable(IndexVerificationResultRepository.getResultTableNameBytes());
     scan = new Scan();
     scanner = hIndexTable.getScanner(scan);
     Result result = scanner.next();
@@ -1244,7 +1244,7 @@ public class IndexToolIT extends BaseTest {
       TestUtil.dumpTable(conn, TableName.valueOf(fullTableName));
       TestUtil.dumpTable(conn, TableName.valueOf(fullIndexName));
       TestUtil.dumpTable(conn,
-        TableName.valueOf(IndexVerificationOutputRepository.OUTPUT_TABLE_NAME));
+        TableName.valueOf(IndexVerificationOutputRepository.getOutputTableName()));
       throw e;
     }
   }
