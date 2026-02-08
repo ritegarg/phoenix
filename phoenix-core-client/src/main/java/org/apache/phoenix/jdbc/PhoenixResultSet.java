@@ -105,6 +105,7 @@ import org.apache.phoenix.thirdparty.com.google.common.base.Strings;
 import org.apache.phoenix.thirdparty.com.google.common.base.Throwables;
 import org.apache.phoenix.thirdparty.com.google.common.primitives.Bytes;
 
+import org.apache.hbase.thirdparty.com.google.gson.JsonObject;
 import org.apache.hbase.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
@@ -1495,6 +1496,11 @@ public class PhoenixResultSet implements PhoenixMonitoredResultSet, SQLCloseable
       }
     }
     return one.aggregate();
+  }
+
+  @Override
+  public List<List<JsonObject>> getTopNSlowestScanMetrics() {
+    return context.getTopNSlowestScanMetrics();
   }
 
   @Override
