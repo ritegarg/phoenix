@@ -730,7 +730,7 @@ public class ParallelPhoenixConnectionIT {
   }
 
   private void testTopNSlowestScanMetrics(ParallelPhoenixResultSetType rsType) throws Exception {
-    Assume.assumeTrue(VersionInfo.compareVersion(VersionInfo.getVersion(), "2.6.3") > 0);
+    // Assume.assumeTrue(VersionInfo.compareVersion(VersionInfo.getVersion(), "2.6.3") > 0);
     try (Connection conn = getParallelConnection()) {
       try (Statement stmt = conn.createStatement()) {
         stmt.executeUpdate(String.format("UPSERT INTO %s VALUES(%d, 1984)", tableName, 0));

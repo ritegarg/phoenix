@@ -61,7 +61,7 @@ public class SlowestScanMetricsIT extends BaseTest {
 
   @BeforeClass
   public static void setup() throws Exception {
-    Assume.assumeTrue(VersionInfo.compareVersion(VersionInfo.getVersion(), "2.6.3") > 0);
+    // Assume.assumeTrue(VersionInfo.compareVersion(VersionInfo.getVersion(), "2.6.3") > 0);
     Map<String, String> props = Maps.newHashMapWithExpectedSize(3);
     props.put(QueryServices.COLLECT_REQUEST_LEVEL_METRICS, "true");
     setUpTestDriver(new ReadOnlyProps(props.entrySet().iterator()));
