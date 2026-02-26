@@ -49,3 +49,6 @@
   testcases:
     - testAllWrappedConnectionsClosedAfterActiveURLChange
     - testAllWrappedConnectionsNotClosedAfterStandbyURLChange
+- suite: org.apache.phoenix.jdbc.ParallelPhoenixConnectionIT
+  testcases:
+    - testAllWrappedConnectionsClosedAfterRegistryChangeToRpc
