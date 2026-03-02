@@ -57,3 +57,4 @@
     - testSelectGeneric
 - suite: org.apache.phoenix.end2end.ConcurrentUpsertsWithoutIndexedColsIT
 - suite: org.apache.phoenix.end2end.index.GlobalImmutableTxIndexWithRegionMovesIT
+- suite: org.apache.phoenix.end2end.UCFWithDisabledIndexWithDDLValidationIT
