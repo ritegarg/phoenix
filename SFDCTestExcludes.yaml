@@ -59,3 +59,4 @@
 - suite: org.apache.phoenix.end2end.index.GlobalImmutableTxIndexWithRegionMovesIT
 - suite: org.apache.phoenix.end2end.UCFWithDisabledIndexWithDDLValidationIT
 - suite: org.apache.phoenix.end2end.AuditLoggingIT
+- suite: org.apache.phoenix.end2end.UCFWithDisabledIndexIT
