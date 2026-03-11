@@ -61,3 +61,7 @@
 - suite: org.apache.phoenix.end2end.UCFWithDisabledIndexWithDDLValidationIT
 - suite: org.apache.phoenix.end2end.AuditLoggingIT
 - suite: org.apache.phoenix.end2end.UCFWithDisabledIndexIT
+- suite: org.apache.phoenix.jdbc.HAGroupStoreClientIT
+  testcases:
+    - testHAGroupStoreClientWithMultiThreadedUpdates
+
