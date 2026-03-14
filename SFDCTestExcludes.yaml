@@ -52,6 +52,7 @@
 - suite: org.apache.phoenix.jdbc.ParallelPhoenixConnectionIT
   testcases:
     - testAllWrappedConnectionsClosedAfterRegistryChangeToRpc
+    - testAllWrappedConnectionsClosedAfterRegistryChangeToMaster
 - suite: org.apache.phoenix.end2end.CDCQueryIT
   testcases:
     - testSelectGeneric
