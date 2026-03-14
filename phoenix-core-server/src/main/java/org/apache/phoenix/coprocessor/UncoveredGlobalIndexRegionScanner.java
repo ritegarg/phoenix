@@ -84,13 +84,24 @@ public class UncoveredGlobalIndexRegionScanner extends UncoveredIndexRegionScann
     Configuration.addDeprecation("index.row.count.per.task", INDEX_ROW_COUNTS_PER_TASK_CONF_KEY);
   }
 
+  // For backward compatibility IncrementalBackupGlobalIndexRegionScanner
   public UncoveredGlobalIndexRegionScanner(final RegionScanner innerScanner, final Region region,
     final Scan scan, final RegionCoprocessorEnvironment env, final Scan dataTableScan,
     final TupleProjector tupleProjector, final IndexMaintainer indexMaintainer,
     final byte[][] viewConstants, final ImmutableBytesWritable ptr, final long pageSizeMs,
     final long queryLimit) throws IOException {
+    this(innerScanner, region, scan, env, dataTableScan, tupleProjector, indexMaintainer,
+      viewConstants, ptr, pageSizeMs, queryLimit, false);
+
+  }
+
+  public UncoveredGlobalIndexRegionScanner(final RegionScanner innerScanner, final Region region,
+    final Scan scan, final RegionCoprocessorEnvironment env, final Scan dataTableScan,
+    final TupleProjector tupleProjector, final IndexMaintainer indexMaintainer,
+    final byte[][] viewConstants, final ImmutableBytesWritable ptr, final long pageSizeMs,
+    final long queryLimit, boolean isDistinct) throws IOException {
     super(innerScanner, region, scan, env, dataTableScan, tupleProjector, indexMaintainer,
-      viewConstants, ptr, pageSizeMs, queryLimit);
+      viewConstants, ptr, pageSizeMs, queryLimit, isDistinct);
     final Configuration config = env.getConfiguration();
     hTableFactory = IndexWriterUtils.getDefaultDelegateHTableFactory(env);
     rowCountPerTask =
