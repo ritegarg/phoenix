@@ -69,4 +69,3 @@
 - suite: org.apache.phoenix.jdbc.HAGroupStoreClientIT
   testcases:
     - testHAGroupStoreClientWithMultiThreadedUpdates
-
