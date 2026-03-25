@@ -23,6 +23,10 @@
 - suite: org.apache.phoenix.monitoring.PhoenixTableLevelMetricsIT
 - suite: org.apache.phoenix.end2end.index.MutableIndexFailureWithNamespaceIT
 - suite: org.apache.phoenix.end2end.IndexToolForNonTxGlobalIndexIT
+- suite: org.apache.phoenix.monitoring.PhoenixMetricsIT
+- suite: org.apache.phoenix.end2end.AggregateWithRegionMoves2IT
+  testcases:
+    - testAvgGroupByDescOrderPreservingWithStats
 - suite: org.apache.phoenix.end2end.AggregateWithRegionMovesIT
   testcases:
     - testAvgGroupByDescOrderPreservingWithStats
